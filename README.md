@@ -190,12 +190,30 @@ exclude:
 5. **Amount Check**: Ensure consecutive payments are within tolerance (default 35%)
 6. **Status**: Mark as ACTIVE if paid in current month or within 5-day grace period, otherwise STOPPED
 
-## Supported Banks
+## Supported Formats
 
-Currently supported:
-- **Handelsbanken** (Sweden) - XLSX export format
+| Source | Description |
+|--------|-------------|
+| `handelsbanken-xlsx` | Handelsbanken (Sweden) XLSX export. Supports both regular accounts and credit cards. |
+| `testdata-json` | Simple JSON format for testing and development. |
 
-The parser handles both regular accounts and credit card exports which have slightly different column layouts.
+### JSON Test Format
+
+The `testdata-json` format is useful for testing or importing from custom sources:
+
+```json
+{
+  "transactions": [
+    {"date": "2025-01-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-02-15", "text": "Netflix", "amount": -99.00}
+  ]
+}
+```
+
+Usage:
+```bash
+./subscription-detector --source testdata-json transactions.json
+```
 
 ## Output Example
 

@@ -1,0 +1,31 @@
+{
+  "transactions": [
+    {"date": "2025-01-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-02-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-03-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-04-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-05-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-06-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-07-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-08-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-09-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-10-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-11-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-12-15", "text": "Netflix", "amount": -99.00},
+    {"date": "2025-01-01", "text": "Spotify", "amount": -119.00},
+    {"date": "2025-02-01", "text": "Spotify", "amount": -119.00},
+    {"date": "2025-03-01", "text": "Spotify", "amount": -119.00},
+    {"date": "2025-04-01", "text": "Spotify", "amount": -119.00},
+    {"date": "2025-05-01", "text": "Spotify", "amount": -119.00},
+    {"date": "2025-06-01", "text": "Spotify", "amount": -119.00},
+    {"date": "2025-07-01", "text": "Spotify", "amount": -129.00},
+    {"date": "2025-08-01", "text": "Spotify", "amount": -129.00},
+    {"date": "2025-09-01", "text": "Spotify", "amount": -129.00},
+    {"date": "2025-10-01", "text": "Spotify", "amount": -129.00},
+    {"date": "2025-11-01", "text": "Spotify", "amount": -129.00},
+    {"date": "2025-12-01", "text": "Spotify", "amount": -129.00},
+    {"date": "2025-03-10", "text": "Grocery Store", "amount": -250.00},
+    {"date": "2025-05-22", "text": "Grocery Store", "amount": -180.00},
+    {"date": "2025-08-05", "text": "Grocery Store", "amount": -320.00}
+  ]
+}

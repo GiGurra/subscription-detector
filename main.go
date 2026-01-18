@@ -14,7 +14,7 @@ import (
 )
 
 type Params struct {
-	Source        string   `descr:"Data source type" alts:"handelsbanken-xlsx" strict:"true"`
+	Source        string   `descr:"Data source type" alts:"handelsbanken-xlsx,testdata-json" strict:"true"`
 	Files         []string `descr:"Path(s) to transaction file(s)" positional:"true"`
 	Config        string   `descr:"Path to config file (YAML)" optional:"true"`
 	InitConfig    string   `descr:"Generate config template and save to path" optional:"true"`
@@ -41,9 +41,15 @@ func main() {
 }
 
 func run(params *Params, _ *cobra.Command, _ []string) {
+	parser, err := GetParser(params.Source)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	var transactions []Transaction
 	for _, file := range params.Files {
-		txs, err := ParseHandelsbankenXLSX(file)
+		txs, err := parser.Parse(file)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error parsing file %s: %v\n", file, err)
 			os.Exit(1)
