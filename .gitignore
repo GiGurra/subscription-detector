@@ -1,0 +1,39 @@
+# Binaries
+subscription-detector
+subscription-detector.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Go build cache
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go workspace
+go.work
+go.work.sum
+
+# Dependency directories (if vendoring)
+vendor/
+
+# Coverage
+coverage.out
+coverage.html
+
+# Debug
+__debug_bin*
