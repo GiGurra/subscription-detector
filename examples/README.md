@@ -12,20 +12,25 @@ This directory contains example data and configuration for subscription-detector
 ### Basic usage (no config)
 
 ```bash
-subscription-detector --source simple-json examples/transactions.json
+subscription-detector --source simple-json examples/transactions.json --config /dev/null
 ```
 
 Output:
 ```
-Found 4 subscriptions (3 active, 1 stopped)
+Found 4 subscriptions (2 active, 2 stopped)
 Showing: active
 
-╭────────────────────────┬────────┬─────┬────────────┬────────────┬────────────┬─────────╮
-│ Name                   │ Status │ Day │ Started    │ Last Seen  │ Monthly    │ Yearly  │
-├────────────────────────┼────────┼─────┼────────────┼────────────┼────────────┼─────────┤
-│ GOOGLE*GSUITE abc123   │ ACTIVE │ ~2  │ 2025-01-02 │ 2025-02-02 │      72 kr │  864 kr │
-│ ...                    │        │     │            │            │            │         │
+╭──────────────────┬────────┬─────┬────────────┬────────────────┬─────────┬─────────╮
+│ Name             │ Status │ Day │ Started    │ Last Seen      │ Monthly │ Yearly  │
+├──────────────────┼────────┼─────┼────────────┼────────────────┼─────────┼─────────┤
+│ Google Workspace │ ACTIVE │ ~2  │ 2025-03-02 │ 2025-06-02     │   76 kr │  912 kr │
+│ NETFLIX.COM      │ ACTIVE │ ~5  │ 2025-01-05 │ 2025-06-05     │  199 kr │ 2388 kr │
+├──────────────────┼────────┼─────┼────────────┼────────────────┼─────────┼─────────┤
+│                  │        │     │            │ TOTAL (ACTIVE) │ 275 KR  │ 3300 KR │
+╰──────────────────┴────────┴─────┴────────────┴────────────────┴─────────┴─────────╯
 ```
+
+Note: Without config, Spotify isn't detected (varying transaction IDs), and the early Google transactions with different names aren't grouped.
 
 ### With configuration
 
@@ -33,11 +38,27 @@ Showing: active
 subscription-detector --source simple-json examples/transactions.json --config examples/config.yaml
 ```
 
-The config will:
-- Group Spotify transactions (varying IDs) into one subscription
-- Group Google Workspace transactions (varying names) into one subscription
-- Add descriptions and tags
-- Exclude McDonald's and one-time purchases
+Output:
+```
+Found 4 subscriptions (3 active, 1 stopped)
+Showing: active
+
+╭──────────────────┬──────────────────┬──────────────────────────┬────────┬─────┬────────────┬────────────────┬────────────┬─────────╮
+│ Name             │ Description      │ Tags                     │ Status │ Day │ Started    │ Last Seen      │ Monthly    │ Yearly  │
+├──────────────────┼──────────────────┼──────────────────────────┼────────┼─────┼────────────┼────────────────┼────────────┼─────────┤
+│ Google Workspace │ Google Workspace │ work, productivity       │ ACTIVE │ ~2  │ 2025-01-02 │ 2025-06-02     │   72-76 kr │  912 kr │
+│ NETFLIX.COM      │ Netflix          │ entertainment, streaming │ ACTIVE │ ~5  │ 2025-01-05 │ 2025-06-05     │     199 kr │ 2388 kr │
+│ Spotify          │                  │ entertainment, music     │ ACTIVE │ ~12 │ 2025-01-12 │ 2025-06-12     │ 169-179 kr │ 2148 kr │
+├──────────────────┼──────────────────┼──────────────────────────┼────────┼─────┼────────────┼────────────────┼────────────┼─────────┤
+│                  │                  │                          │        │     │            │ TOTAL (ACTIVE) │ 454 KR     │ 5448 KR │
+╰──────────────────┴──────────────────┴──────────────────────────┴────────┴─────┴────────────┴────────────────┴────────────┴─────────╯
+```
+
+The config:
+- Groups Spotify transactions (varying IDs) into one subscription
+- Groups Google Workspace transactions (varying names) into one
+- Adds descriptions and tags
+- Excludes McDonald's and one-time purchases
 
 ### JSON output
 
