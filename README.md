@@ -31,10 +31,16 @@ go build .
 ### Basic Usage
 
 ```bash
-# Analyze a single transaction file
+# Analyze a single transaction file (format prefix syntax)
+./subscription-detector handelsbanken-xlsx:transactions.xlsx
+
+# Or use --source flag
 ./subscription-detector --source handelsbanken-xlsx transactions.xlsx
 
-# Analyze multiple files (e.g., checking account + credit card)
+# Mix different formats in one command
+./subscription-detector handelsbanken-xlsx:bank.xlsx simple-json:other.json
+
+# Multiple files with same format
 ./subscription-detector --source handelsbanken-xlsx account.xlsx creditcard.xlsx
 ```
 
@@ -42,7 +48,7 @@ go build .
 
 ```
 Flags:
-  -s, --source string        Data source type (required)
+  -s, --source string        Default format (or use format:path syntax)
   -c, --config string        Path to config file (YAML)
   -i, --init-config string   Generate config template and save to path
       --show string          Which subscriptions to show: active, stopped, all (default "active")
@@ -212,7 +218,7 @@ The `simple-json` format is useful for importing from custom sources or converte
 
 Usage:
 ```bash
-./subscription-detector --source simple-json transactions.json
+./subscription-detector simple-json:transactions.json
 ```
 
 ## Output Example
