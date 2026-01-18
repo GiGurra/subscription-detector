@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/GiGurra/boa/pkg/boa"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -17,6 +19,8 @@ type Params struct {
 	Config        string   `descr:"Path to config file (YAML)" optional:"true"`
 	InitConfig    string   `descr:"Generate config template and save to path" optional:"true"`
 	Show          string   `descr:"Which subscriptions to show" default:"active" alts:"active,stopped,all" strict:"true"`
+	Sort          string   `descr:"Sort field for output" default:"name" alts:"name,description,amount" strict:"true"`
+	SortDir       string   `descr:"Sort direction" default:"asc" alts:"asc,desc" strict:"true"`
 	Tolerance     float64  `descr:"Max price change between months (0.35 = 35%)" default:"0.35"`
 	SuggestGroups bool     `descr:"Analyze and suggest potential transaction groups" optional:"true"`
 }
@@ -116,7 +120,7 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 	// Filter by status for display (but show total counts first)
 	displaySubs := filterByStatus(subscriptions, params.Show)
 
-	printSubscriptionSummary(subscriptions, displaySubs, params.Show, cfg)
+	printSubscriptionSummary(subscriptions, displaySubs, params.Show, params.Sort, params.SortDir, cfg)
 }
 
 func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {
@@ -144,7 +148,7 @@ func filterByStatus(subs []Subscription, show string) []Subscription {
 	return result
 }
 
-func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription, showFilter string, cfg *Config) {
+func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription, showFilter string, sortField string, sortDir string, cfg *Config) {
 	// Count from all subscriptions (before filtering)
 	activeCount := 0
 	stoppedCount := 0
@@ -163,6 +167,33 @@ func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription
 	fmt.Printf("Found %d subscriptions (%d active, %d stopped)\n",
 		len(allSubs), activeCount, stoppedCount)
 	fmt.Printf("Showing: %s\n\n", showFilter)
+
+	// Sort displayed subscriptions
+	sort.Slice(displaySubs, func(i, j int) bool {
+		var less bool
+		switch sortField {
+		case "amount":
+			less = math.Abs(displaySubs[i].AvgAmount) < math.Abs(displaySubs[j].AvgAmount)
+		case "description":
+			iName := displaySubs[i].Name
+			jName := displaySubs[j].Name
+			if cfg != nil {
+				if desc := cfg.GetDescription(iName); desc != "" {
+					iName = desc
+				}
+				if desc := cfg.GetDescription(jName); desc != "" {
+					jName = desc
+				}
+			}
+			less = strings.ToLower(iName) < strings.ToLower(jName)
+		default: // "name"
+			less = strings.ToLower(displaySubs[i].Name) < strings.ToLower(displaySubs[j].Name)
+		}
+		if sortDir == "desc" {
+			return !less
+		}
+		return less
+	})
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
