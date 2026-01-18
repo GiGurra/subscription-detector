@@ -191,11 +191,11 @@ func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription
 		}
 	}
 
-	// Calculate totals from displayed subscriptions only
+	// Calculate totals from displayed subscriptions only (using latest amount)
 	var totalMonthlyCost float64
 	for _, sub := range displaySubs {
 		if sub.Status == StatusActive {
-			totalMonthlyCost += math.Abs(sub.AvgAmount)
+			totalMonthlyCost += math.Abs(sub.LatestAmount)
 		}
 	}
 	totalYearlyCost := totalMonthlyCost * 12
@@ -277,7 +277,7 @@ func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription
 			monthlyStr = fmt.Sprintf("%.0f-%.0f kr", sub.MinAmount, sub.MaxAmount)
 		}
 
-		yearlyAmount := math.Abs(sub.AvgAmount) * 12
+		yearlyAmount := math.Abs(sub.LatestAmount) * 12
 		yearlyStr := fmt.Sprintf("%.0f kr", yearlyAmount)
 		if sub.Status == StatusStopped {
 			yearlyStr = text.FgHiBlack.Sprint("-")

@@ -18,6 +18,7 @@ const (
 type Subscription struct {
 	Name         string
 	AvgAmount    float64
+	LatestAmount float64 // most recent payment amount (used for totals)
 	MinAmount    float64
 	MaxAmount    float64
 	Transactions []Transaction

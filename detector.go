@@ -73,6 +73,7 @@ func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRa
 
 		startDate := allExpenses[0].Date
 		lastDate := allExpenses[len(allExpenses)-1].Date
+		latestAmount := allExpenses[len(allExpenses)-1].Amount
 
 		// Determine status
 		status := DetermineStatus(lastDate, typicalDay, dateRange.End)
@@ -80,6 +81,7 @@ func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRa
 		subscriptions = append(subscriptions, Subscription{
 			Name:         name,
 			AvgAmount:    avgAmount,
+			LatestAmount: latestAmount,
 			MinAmount:    minAmount,
 			MaxAmount:    maxAmount,
 			Transactions: allExpenses,
