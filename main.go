@@ -10,7 +10,7 @@ import (
 )
 
 type Params struct {
-	Source        string   `descr:"Data source type" alts:"handelsbanken-xlsx,simple-json" strict:"true"`
+	Source        string   `descr:"Default format (or use format:path syntax)" alts:"handelsbanken-xlsx,simple-json" optional:"true"`
 	Files         []string `descr:"Path(s) to transaction file(s)" positional:"true"`
 	Config        string   `descr:"Path to config file (YAML)" optional:"true"`
 	InitConfig    string   `descr:"Generate config template and save to path" optional:"true"`
@@ -45,20 +45,29 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 		}
 	}
 
-	parser, err := internal.GetParser(params.Source)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
 	var transactions []internal.Transaction
-	for _, file := range params.Files {
-		txs, err := parser.Parse(file)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing file %s: %v\n", file, err)
+	for _, fileArg := range params.Files {
+		format, filePath := internal.ParseFileArg(fileArg)
+		if format == "" {
+			format = params.Source // Fall back to --source flag
+		}
+		if format == "" {
+			fmt.Fprintf(os.Stderr, "Error: no format specified for %s (use format:path or --source)\n", filePath)
 			os.Exit(1)
 		}
-		info("Loaded %d transactions from %s\n", len(txs), file)
+
+		parser, err := internal.GetParser(format)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		txs, err := parser.Parse(filePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing file %s: %v\n", filePath, err)
+			os.Exit(1)
+		}
+		info("Loaded %d transactions from %s\n", len(txs), filePath)
 		transactions = append(transactions, txs...)
 	}
 

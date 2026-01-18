@@ -24,10 +24,16 @@ go test -v .
 ## Usage
 
 ```bash
-# Basic detection (auto-loads config from ~/.subscription-detector/config.yaml)
+# Basic detection with format prefix (auto-loads config from ~/.subscription-detector/config.yaml)
+./subscription-detector handelsbanken-xlsx:transactions.xlsx
+
+# Or use --source flag for all files
 ./subscription-detector --source handelsbanken-xlsx transactions.xlsx
 
-# Multiple files
+# Mix different formats in one command
+./subscription-detector handelsbanken-xlsx:bank.xlsx simple-json:other.json
+
+# Multiple files with same format
 ./subscription-detector --source handelsbanken-xlsx account.xlsx creditcard.xlsx
 
 # Show all including stopped

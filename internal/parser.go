@@ -1,6 +1,9 @@
 package internal
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Parser parses transaction files into a list of transactions
 type Parser interface {
@@ -38,6 +41,29 @@ func AvailableSources() []string {
 		sources = append(sources, name)
 	}
 	return sources
+}
+
+// IsKnownParser returns true if the name is a registered parser
+func IsKnownParser(name string) bool {
+	_, ok := parsers[name]
+	return ok
+}
+
+// ParseFileArg parses a file argument that may have a format prefix.
+// Returns (format, path). If no valid prefix, format is empty.
+// Example: "simple-json:data.json" → ("simple-json", "data.json")
+// Example: "data.json" → ("", "data.json")
+// Example: "C:\path\file.xlsx" → ("", "C:\path\file.xlsx") // Windows path
+func ParseFileArg(arg string) (format, path string) {
+	idx := strings.Index(arg, ":")
+	if idx == -1 {
+		return "", arg
+	}
+	prefix := arg[:idx]
+	if IsKnownParser(prefix) {
+		return prefix, arg[idx+1:]
+	}
+	return "", arg // Not a known parser, treat whole thing as path
 }
 
 func init() {
