@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gigurra/subscription-detector/internal"
 )
 
 // runCLI runs the subscription-detector CLI with the given args and returns stdout
@@ -34,12 +36,12 @@ func runCLI(t *testing.T, args ...string) string {
 }
 
 // runCLIJSON runs the CLI with JSON output and parses the result
-func runCLIJSON(t *testing.T, args ...string) JSONOutput {
+func runCLIJSON(t *testing.T, args ...string) internal.JSONOutput {
 	t.Helper()
 	fullArgs := append(args, "--output", "json")
 	output := runCLI(t, fullArgs...)
 
-	var result JSONOutput
+	var result internal.JSONOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("failed to parse JSON output: %v\nOutput: %s", err, output)
 	}
@@ -71,12 +73,12 @@ func runCLIWithConfig(t *testing.T, configContent string, args ...string) string
 }
 
 // runCLIWithConfigJSON runs the CLI with config and JSON output
-func runCLIWithConfigJSON(t *testing.T, configContent string, args ...string) JSONOutput {
+func runCLIWithConfigJSON(t *testing.T, configContent string, args ...string) internal.JSONOutput {
 	t.Helper()
 	fullArgs := append(args, "--output", "json")
 	output := runCLIWithConfig(t, configContent, fullArgs...)
 
-	var result JSONOutput
+	var result internal.JSONOutput
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		t.Fatalf("failed to parse JSON output: %v\nOutput: %s", err, output)
 	}
