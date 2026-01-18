@@ -22,9 +22,22 @@ type ExcludeRule struct {
 	afterDate  time.Time      `yaml:"-"`
 }
 
+// Group allows grouping multiple transaction patterns under a single name
+type Group struct {
+	Name      string   `yaml:"name"`
+	Patterns  []string `yaml:"patterns"`
+	Tolerance *float64 `yaml:"tolerance,omitempty"` // Optional custom tolerance for this group
+
+	// compiled patterns
+	regexes []*regexp.Regexp `yaml:"-"`
+}
+
 type Config struct {
 	// Descriptions maps subscription names to custom descriptions
 	Descriptions map[string]string `yaml:"descriptions,omitempty"`
+
+	// Groups allows combining multiple transaction patterns into one subscription
+	Groups []Group `yaml:"groups,omitempty"`
 
 	// Exclude is a list of exclusion rules (can be strings or objects with time bounds)
 	Exclude []yaml.Node `yaml:"exclude,omitempty"`
@@ -51,6 +64,17 @@ func LoadConfig(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
+	}
+
+	// Compile group patterns
+	for i := range cfg.Groups {
+		for _, pattern := range cfg.Groups[i].Patterns {
+			re, err := regexp.Compile("(?i)" + pattern) // case-insensitive
+			if err != nil {
+				return nil, fmt.Errorf("invalid group pattern %q: %w", pattern, err)
+			}
+			cfg.Groups[i].regexes = append(cfg.Groups[i].regexes, re)
+		}
 	}
 
 	// Parse exclude rules (supports both strings and objects)
@@ -151,6 +175,32 @@ func (c *Config) GetDescription(name string) string {
 		return ""
 	}
 	return c.Descriptions[name]
+}
+
+// ApplyGroups transforms transactions by replacing names that match group patterns
+// with the group name. Returns the transformed transactions and a map of group tolerances.
+func (c *Config) ApplyGroups(txs []Transaction) ([]Transaction, map[string]float64) {
+	tolerances := make(map[string]float64)
+	if c == nil || len(c.Groups) == 0 {
+		return txs, tolerances
+	}
+
+	result := make([]Transaction, len(txs))
+	for i, tx := range txs {
+		result[i] = tx
+		for _, group := range c.Groups {
+			for _, re := range group.regexes {
+				if re.MatchString(tx.Text) {
+					result[i].Text = group.Name
+					if group.Tolerance != nil {
+						tolerances[group.Name] = *group.Tolerance
+					}
+					break
+				}
+			}
+		}
+	}
+	return result, tolerances
 }
 
 // GenerateFromSubscriptions creates a config template from detected subscriptions

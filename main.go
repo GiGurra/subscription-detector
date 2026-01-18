@@ -12,12 +12,13 @@ import (
 )
 
 type Params struct {
-	Source     string   `descr:"Data source type" alts:"handelsbanken-xlsx" strict:"true"`
-	Files      []string `descr:"Path(s) to transaction file(s)" positional:"true"`
-	Config     string   `descr:"Path to config file (YAML)" optional:"true"`
-	InitConfig string   `descr:"Generate config template and save to path" optional:"true"`
-	Show       string   `descr:"Which subscriptions to show" default:"active" alts:"active,stopped,all" strict:"true"`
-	Tolerance  float64  `descr:"Max price change between months (0.35 = 35%)" default:"0.35"`
+	Source        string   `descr:"Data source type" alts:"handelsbanken-xlsx" strict:"true"`
+	Files         []string `descr:"Path(s) to transaction file(s)" positional:"true"`
+	Config        string   `descr:"Path to config file (YAML)" optional:"true"`
+	InitConfig    string   `descr:"Generate config template and save to path" optional:"true"`
+	Show          string   `descr:"Which subscriptions to show" default:"active" alts:"active,stopped,all" strict:"true"`
+	Tolerance     float64  `descr:"Max price change between months (0.35 = 35%)" default:"0.35"`
+	SuggestGroups bool     `descr:"Analyze and suggest potential transaction groups" optional:"true"`
 }
 
 func main() {
@@ -48,19 +49,6 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 
 	fmt.Printf("Total: %d transactions from %d file(s)\n", len(transactions), len(params.Files))
 
-	// Check data coverage
-	completeMonths, dateRange := AnalyzeDataCoverage(transactions)
-	fmt.Printf("Data range: %s to %s\n", dateRange.Start.Format("2006-01-02"), dateRange.End.Format("2006-01-02"))
-	fmt.Printf("Complete months: %d\n\n", len(completeMonths))
-
-	if len(completeMonths) < 3 {
-		fmt.Fprintf(os.Stderr, "Warning: Less than 3 complete months of data. Subscription detection may be unreliable.\n\n")
-	}
-
-	// Filter to only complete months for pattern detection
-	filtered := FilterToCompleteMonths(transactions, completeMonths)
-	subscriptions := DetectSubscriptions(filtered, transactions, dateRange, params.Tolerance)
-
 	// Load config (from provided path or default location)
 	var cfg *Config
 	configPath := params.Config
@@ -78,16 +66,29 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Loaded config from %s\n\n", configPath)
+		fmt.Printf("Loaded config from %s\n", configPath)
 	}
+
+	// Apply grouping from config (combines transactions with different names into one)
+	transactions, _ = cfg.ApplyGroups(transactions)
+
+	// Check data coverage
+	completeMonths, dateRange := AnalyzeDataCoverage(transactions)
+	fmt.Printf("Data range: %s to %s\n", dateRange.Start.Format("2006-01-02"), dateRange.End.Format("2006-01-02"))
+	fmt.Printf("Complete months: %d\n\n", len(completeMonths))
+
+	if len(completeMonths) < 3 {
+		fmt.Fprintf(os.Stderr, "Warning: Less than 3 complete months of data. Subscription detection may be unreliable.\n\n")
+	}
+
+	// Filter to only complete months for pattern detection
+	filtered := FilterToCompleteMonths(transactions, completeMonths)
+	subscriptions := DetectSubscriptions(filtered, transactions, dateRange, params.Tolerance)
 
 	// Apply exclusion filters from config
 	if cfg != nil {
 		subscriptions = filterSubscriptions(subscriptions, cfg)
 	}
-
-	// Filter by status based on --show flag
-	subscriptions = filterByStatus(subscriptions, params.Show)
 
 	// Generate config template if requested
 	if params.InitConfig != "" {
@@ -100,12 +101,22 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 		return
 	}
 
+	// Suggest groups if requested
+	if params.SuggestGroups {
+		suggestions := SuggestGroups(transactions, params.Tolerance)
+		PrintGroupSuggestions(suggestions)
+		return
+	}
+
 	if len(subscriptions) == 0 {
 		fmt.Println("No subscriptions detected.")
 		return
 	}
 
-	printSubscriptionSummary(subscriptions, cfg)
+	// Filter by status for display (but show total counts first)
+	displaySubs := filterByStatus(subscriptions, params.Show)
+
+	printSubscriptionSummary(subscriptions, displaySubs, params.Show, cfg)
 }
 
 func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {
@@ -133,12 +144,13 @@ func filterByStatus(subs []Subscription, show string) []Subscription {
 	return result
 }
 
-func printSubscriptionSummary(subscriptions []Subscription, cfg *Config) {
+func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription, showFilter string, cfg *Config) {
+	// Count from all subscriptions (before filtering)
 	activeCount := 0
 	stoppedCount := 0
 	var totalMonthlyCost float64
 
-	for _, sub := range subscriptions {
+	for _, sub := range allSubs {
 		if sub.Status == StatusActive {
 			activeCount++
 			totalMonthlyCost += math.Abs(sub.AvgAmount)
@@ -148,16 +160,17 @@ func printSubscriptionSummary(subscriptions []Subscription, cfg *Config) {
 	}
 	totalYearlyCost := totalMonthlyCost * 12
 
-	fmt.Printf("Found %d subscriptions (%d active, %d stopped)\n\n",
-		len(subscriptions), activeCount, stoppedCount)
+	fmt.Printf("Found %d subscriptions (%d active, %d stopped)\n",
+		len(allSubs), activeCount, stoppedCount)
+	fmt.Printf("Showing: %s\n\n", showFilter)
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
-	// Check if any subscription has a description
+	// Check if any displayed subscription has a description
 	hasDescriptions := false
 	if cfg != nil {
-		for _, sub := range subscriptions {
+		for _, sub := range displaySubs {
 			if cfg.GetDescription(sub.Name) != "" {
 				hasDescriptions = true
 				break
@@ -171,7 +184,7 @@ func printSubscriptionSummary(subscriptions []Subscription, cfg *Config) {
 		t.AppendHeader(table.Row{"Name", "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly"})
 	}
 
-	for _, sub := range subscriptions {
+	for _, sub := range displaySubs {
 		status := text.FgGreen.Sprint("ACTIVE")
 		if sub.Status == StatusStopped {
 			status = text.FgRed.Sprint("STOPPED")
