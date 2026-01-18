@@ -210,10 +210,10 @@ exclude:
 
 ### Currency
 
-Set the currency for amount formatting. If not specified, it's auto-detected from your system locale (LC_MONETARY, LC_ALL, or LANG), falling back to SEK.
+Set the currency for amount formatting. If not specified, it's auto-detected from your system locale, falling back to SEK.
 
 ```yaml
-currency: USD  # or EUR, GBP, SEK, NOK, DKK, CHF, JPY, CAD, AUD
+currency: USD  # or EUR, GBP, SEK, NOK, DKK, CHF, JPY, CAD, AUD, BRL, etc.
 ```
 
 Currency affects how amounts are displayed:
@@ -221,8 +221,21 @@ Currency affects how amounts are displayed:
 - **USD/GBP/CAD/AUD**: `$1,234` (comma separator, prefix)
 - **EUR**: `1.234 €` (period separator, suffix)
 - **JPY**: `¥1,234` (comma separator, prefix)
+- **BRL**: `1.234 R$` (period separator, suffix)
 
 You can also override via CLI: `--currency USD`
+
+#### Cross-Platform Locale Detection
+
+The tool automatically detects your system currency based on locale:
+
+| Platform | Detection Method |
+|----------|------------------|
+| **Linux/Unix** | `LC_MONETARY` → `LC_ALL` → `LANG` environment variables |
+| **macOS** | Environment variables, then `AppleLocale` system preference |
+| **Windows** | `GetUserDefaultLocaleName` API |
+
+Any locale with a region code is supported (e.g., `pt_BR` → BRL, `ja_JP` → JPY, `de_DE` → EUR).
 
 ## Detection Algorithm
 
