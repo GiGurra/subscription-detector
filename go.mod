@@ -6,6 +6,7 @@ require (
 	github.com/GiGurra/boa v0.3.73
 	github.com/jedib0t/go-pretty/v6 v6.7.8
 	github.com/xuri/excelize/v2 v2.10.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

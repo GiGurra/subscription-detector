@@ -11,8 +11,10 @@ import (
 )
 
 type Params struct {
-	Source string `descr:"Data source type" alts:"handelsbanken-xlsx" strict:"true"`
-	File   string `descr:"Path to the transaction file" positional:"true"`
+	Source     string `descr:"Data source type" alts:"handelsbanken-xlsx" strict:"true"`
+	File       string `descr:"Path to the transaction file" positional:"true"`
+	Config     string `descr:"Path to config file (YAML)" optional:"true"`
+	InitConfig string `descr:"Generate config template and save to path" optional:"true"`
 }
 
 func main() {
@@ -41,17 +43,54 @@ func main() {
 			filtered := FilterToCompleteMonths(transactions, completeMonths)
 			subscriptions := DetectSubscriptions(filtered, transactions, dateRange)
 
+			// Load config if provided
+			var cfg *Config
+			if params.Config != "" {
+				cfg, err = LoadConfig(params.Config)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Printf("Loaded config from %s\n\n", params.Config)
+			}
+
+			// Apply exclusion filters from config
+			if cfg != nil {
+				subscriptions = filterSubscriptions(subscriptions, cfg)
+			}
+
+			// Generate config template if requested
+			if params.InitConfig != "" {
+				template := GenerateConfigTemplate(subscriptions)
+				if err := template.Save(params.InitConfig); err != nil {
+					fmt.Fprintf(os.Stderr, "Error saving config template: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Printf("Config template saved to %s\n", params.InitConfig)
+				return
+			}
+
 			if len(subscriptions) == 0 {
 				fmt.Println("No subscriptions detected.")
 				return
 			}
 
-			printSubscriptionSummary(subscriptions)
+			printSubscriptionSummary(subscriptions, cfg)
 		}).
 		Run()
 }
 
-func printSubscriptionSummary(subscriptions []Subscription) {
+func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {
+	var result []Subscription
+	for _, sub := range subs {
+		if !cfg.ShouldExclude(sub.Name) {
+			result = append(result, sub)
+		}
+	}
+	return result
+}
+
+func printSubscriptionSummary(subscriptions []Subscription, cfg *Config) {
 	activeCount := 0
 	stoppedCount := 0
 	var totalMonthlyCost float64
@@ -71,7 +110,23 @@ func printSubscriptionSummary(subscriptions []Subscription) {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly"})
+
+	// Check if any subscription has a description
+	hasDescriptions := false
+	if cfg != nil {
+		for _, sub := range subscriptions {
+			if cfg.GetDescription(sub.Name) != "" {
+				hasDescriptions = true
+				break
+			}
+		}
+	}
+
+	if hasDescriptions {
+		t.AppendHeader(table.Row{"Name", "Description", "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly"})
+	} else {
+		t.AppendHeader(table.Row{"Name", "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly"})
+	}
 
 	for _, sub := range subscriptions {
 		status := text.FgGreen.Sprint("ACTIVE")
@@ -92,35 +147,71 @@ func printSubscriptionSummary(subscriptions []Subscription) {
 
 		dayStr := fmt.Sprintf("~%d", sub.TypicalDay)
 
-		t.AppendRow(table.Row{
-			sub.Name,
-			status,
-			dayStr,
-			sub.StartDate.Format("2006-01-02"),
-			sub.LastDate.Format("2006-01-02"),
-			monthlyStr,
-			yearlyStr,
-		})
+		if hasDescriptions {
+			desc := ""
+			if cfg != nil {
+				desc = cfg.GetDescription(sub.Name)
+			}
+			t.AppendRow(table.Row{
+				sub.Name,
+				desc,
+				status,
+				dayStr,
+				sub.StartDate.Format("2006-01-02"),
+				sub.LastDate.Format("2006-01-02"),
+				monthlyStr,
+				yearlyStr,
+			})
+		} else {
+			t.AppendRow(table.Row{
+				sub.Name,
+				status,
+				dayStr,
+				sub.StartDate.Format("2006-01-02"),
+				sub.LastDate.Format("2006-01-02"),
+				monthlyStr,
+				yearlyStr,
+			})
+		}
 	}
 
 	t.AppendSeparator()
-	t.AppendFooter(table.Row{
-		"",
-		"",
-		"",
-		"",
-		text.Bold.Sprint("Total (active)"),
-		text.Bold.Sprintf("%.0f kr", totalMonthlyCost),
-		text.Bold.Sprintf("%.0f kr", totalYearlyCost),
-	})
+	if hasDescriptions {
+		t.AppendFooter(table.Row{
+			"",
+			"",
+			"",
+			"",
+			"",
+			text.Bold.Sprint("Total (active)"),
+			text.Bold.Sprintf("%.0f kr", totalMonthlyCost),
+			text.Bold.Sprintf("%.0f kr", totalYearlyCost),
+		})
+	} else {
+		t.AppendFooter(table.Row{
+			"",
+			"",
+			"",
+			"",
+			text.Bold.Sprint("Total (active)"),
+			text.Bold.Sprintf("%.0f kr", totalMonthlyCost),
+			text.Bold.Sprintf("%.0f kr", totalYearlyCost),
+		})
+	}
 
 	t.SetStyle(table.StyleRounded)
 	t.Style().Format.Header = text.FormatDefault
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, AutoMerge: false},
-		{Number: 6, Align: text.AlignRight},
-		{Number: 7, Align: text.AlignRight},
-	})
+	if hasDescriptions {
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 7, Align: text.AlignRight},
+			{Number: 8, Align: text.AlignRight},
+		})
+	} else {
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 6, Align: text.AlignRight},
+			{Number: 7, Align: text.AlignRight},
+		})
+	}
 
 	t.Render()
 }
