@@ -210,7 +210,7 @@ exclude:
 
 ### Currency
 
-Set the currency for amount formatting. If not specified, it's auto-detected from your system locale, falling back to SEK.
+Set the currency for amount formatting. If not specified, it's auto-detected from your system locale, falling back to USD.
 
 ```yaml
 currency: USD  # or EUR, GBP, SEK, NOK, DKK, CHF, JPY, CAD, AUD, BRL, etc.

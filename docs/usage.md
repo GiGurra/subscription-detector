@@ -70,7 +70,7 @@ The currency determines:
 - Symbol and position (`$100` vs `100 kr`)
 - Thousand separator (`,` vs ` ` vs `.`)
 
-Priority: CLI flag (`--currency`) > config file (`currency:`) > system locale > SEK default
+Priority: CLI flag (`--currency`) > config file (`currency:`) > system locale > USD default
 
 ## Detection Tuning
 

@@ -153,7 +153,7 @@ Set the currency code for amount formatting:
 currency: USD
 ```
 
-If not specified, the currency is auto-detected from system locale environment variables (LC_MONETARY, LC_ALL, LANG), falling back to SEK.
+If not specified, the currency is auto-detected from system locale environment variables (LC_MONETARY, LC_ALL, LANG), falling back to USD.
 
 **Supported currencies:**
 

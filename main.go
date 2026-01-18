@@ -102,7 +102,7 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 		}
 	}
 
-	// Resolve currency with precedence: CLI > config > locale > "SEK"
+	// Resolve currency with precedence: CLI > config > locale > USD
 	currencyCode := params.Currency
 	if currencyCode == "" && cfg != nil {
 		currencyCode = cfg.Currency
@@ -111,7 +111,7 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 		currencyCode = internal.DetectSystemCurrency()
 	}
 	if currencyCode == "" {
-		currencyCode = "SEK"
+		currencyCode = "USD"
 	}
 	currency := internal.GetCurrency(currencyCode)
 
