@@ -221,6 +221,64 @@ Usage:
 ./subscription-detector simple-json:transactions.json
 ```
 
+### Adding a Custom Format
+
+To add support for a new bank or data source, create a parser file in `internal/`:
+
+```go
+// internal/parser_mybank.go
+package internal
+
+import (
+    "encoding/csv"
+    "os"
+    "strconv"
+    "time"
+)
+
+func ParseMyBank(path string) ([]Transaction, error) {
+    f, err := os.Open(path)
+    if err != nil {
+        return nil, err
+    }
+    defer f.Close()
+
+    reader := csv.NewReader(f)
+    records, err := reader.ReadAll()
+    if err != nil {
+        return nil, err
+    }
+
+    var transactions []Transaction
+    for _, row := range records[1:] { // skip header
+        date, _ := time.Parse("2006-01-02", row[0])
+        amount, _ := strconv.ParseFloat(row[2], 64)
+        transactions = append(transactions, Transaction{
+            Date:   date,
+            Text:   row[1],  // payee/description
+            Amount: amount,  // negative for expenses
+        })
+    }
+    return transactions, nil
+}
+
+func init() {
+    RegisterParser("mybank-csv", ParserFunc(ParseMyBank))
+}
+```
+
+The `Transaction` struct requires:
+- `Date` - transaction date (`time.Time`)
+- `Text` - payee name or description (`string`)
+- `Amount` - transaction amount, negative for expenses (`float64`)
+
+After adding the file, rebuild and use. Since the file is in the `internal` package (already imported by `main.go`), the `init()` function runs automatically - no additional imports needed.
+
+```bash
+go build .
+./subscription-detector mybank-csv:export.csv
+```
+
 ## Output Example
 
 ```
