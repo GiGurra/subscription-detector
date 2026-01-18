@@ -14,24 +14,29 @@ A CLI tool to detect recurring monthly subscriptions from bank transaction expor
 ## Quick Example
 
 ```bash
-$ ./subscription-detector handelsbanken-xlsx:transactions.xlsx --show all
+$ subscription-detector --source handelsbanken-xlsx account.xlsx creditcard.xlsx --show all
 
-Loaded 27 transactions from transactions.xlsx
-Data range: 2025-01-02 to 2025-06-12
-Complete months: 5
+Loaded 115 transactions from account.xlsx
+Loaded 688 transactions from creditcard.xlsx
+Total: 803 transactions from 2 file(s)
+Loaded config from /home/user/.subscription-detector/config.yaml
+Data range: 2025-01-02 to 2026-01-15
+Complete months: 12
 
-Found 4 subscriptions (3 active, 1 stopped)
+Found 17 subscriptions (12 active, 5 stopped)
+Showing: all
 
-+------------------+-------------+---------------+---------+-----+------------+------------+---------+
-| Name             | Description | Tags          | Status  | Day | Last Seen  | Monthly    | Yearly  |
-+------------------+-------------+---------------+---------+-----+------------+------------+---------+
-| Google Workspace |             | work          | ACTIVE  | ~2  | 2025-06-02 |  72-76 kr  |  912 kr |
-| GYM MEMBERSHIP   |             | health        | STOPPED | ~20 | 2025-03-20 |    399 kr  |       - |
-| NETFLIX.COM      | Netflix     | entertainment | ACTIVE  | ~5  | 2025-06-05 |    199 kr  | 2388 kr |
-| Spotify          |             | music         | ACTIVE  | ~12 | 2025-06-12 | 169-179 kr | 2148 kr |
-+------------------+-------------+---------------+---------+-----+------------+------------+---------+
-|                  |             |               |         |     |      TOTAL |    454 KR  | 5448 KR |
-+------------------+-------------+---------------+---------+-----+------------+------------+---------+
++------------------+----------------------+---------------+---------+-----+------------+----------------+------------+----------+
+| Name             | Description          | Tags          | Status  | Day | Started    | Last Seen      | Monthly    | Yearly   |
++------------------+----------------------+---------------+---------+-----+------------+----------------+------------+----------+
+| NETFLIX.COM      | Netflix              | entertainment | ACTIVE  | ~15 | 2025-01-15 | 2026-01-15     |     229 kr |  2748 kr |
+| Spotify          | Spotify Family       | music         | ACTIVE  | ~1  | 2025-01-01 | 2026-01-01     | 189-199 kr |  2388 kr |
+| Google Workspace |                      | work          | ACTIVE  | ~2  | 2025-01-02 | 2026-01-02     |   72-76 kr |   912 kr |
+| GYM MEMBERSHIP   | Fitness Center       | health        | STOPPED | ~20 | 2025-01-20 | 2025-09-20     |     399 kr |        - |
+| ...              |                      |               |         |     |            |                |            |          |
++------------------+----------------------+---------------+---------+-----+------------+----------------+------------+----------+
+|                  |                      |               |         |     |            | TOTAL (ACTIVE) |   1852 KR  | 22228 KR |
++------------------+----------------------+---------------+---------+-----+------------+----------------+------------+----------+
 ```
 
 ## How It Works
