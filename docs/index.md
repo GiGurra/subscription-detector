@@ -47,6 +47,10 @@ Showing: all
 4. Analyze remaining transactions for monthly patterns
 5. Calculate statistics and determine active/stopped status
 
+## Development
+
+This tool was hacked together in a couple of hours using [Claude Code](https://claude.ai/claude-code) with Claude Opus 4.5. From initial idea to working CLI with tests, CI/CD, and documentation - all built through conversation.
+
 ## Getting Started
 
 See [Installation](installation.md) to get started, or jump to [Usage](usage.md) if you already have it installed.

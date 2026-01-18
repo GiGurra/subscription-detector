@@ -321,6 +321,10 @@ Showing: all
 ╰──────────────────┴──────────────────┴──────────────────────────┴─────────┴─────┴────────────┴────────────────┴────────────┴─────────╯
 ```
 
+## Development
+
+This tool was hacked together in a couple of hours using [Claude Code](https://claude.ai/claude-code) with Claude Opus 4.5. From initial idea to working CLI with tests, CI/CD, and documentation - all built through conversation.
+
 ## License
 
 MIT
