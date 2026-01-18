@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gigurra/subscription-detector/internal"
+	"github.com/xuri/excelize/v2"
 )
 
 // runCLI runs the subscription-detector CLI with the given args and returns stdout
@@ -314,5 +316,110 @@ func TestCLI_EmptyResult(t *testing.T) {
 	}
 	if len(result.Subscriptions) != 0 {
 		t.Error("expected empty subscriptions array")
+	}
+}
+
+func TestCLI_FormatPrefixSyntax(t *testing.T) {
+	// Test using format:path prefix syntax instead of --source flag
+	result := runCLIJSON(t, "simple-json:testdata/sample.json")
+
+	if result.Summary.Count != 2 {
+		t.Errorf("expected 2 subscriptions with prefix syntax, got %d", result.Summary.Count)
+	}
+}
+
+// createTestXLSX creates a minimal Handelsbanken-format xlsx file for testing
+func createTestXLSX(t *testing.T, path string, transactions [][]string) {
+	t.Helper()
+	f := excelize.NewFile()
+	sheet := f.GetSheetName(0)
+
+	// Header row
+	f.SetCellValue(sheet, "A1", "Reskontradatum")
+	f.SetCellValue(sheet, "B1", "Text")
+	f.SetCellValue(sheet, "C1", "Belopp")
+
+	// Data rows
+	for i, tx := range transactions {
+		row := i + 2
+		f.SetCellValue(sheet, fmt.Sprintf("A%d", row), tx[0]) // date
+		f.SetCellValue(sheet, fmt.Sprintf("B%d", row), tx[1]) // text
+		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), tx[2]) // amount
+	}
+
+	if err := f.SaveAs(path); err != nil {
+		t.Fatalf("failed to create test xlsx: %v", err)
+	}
+}
+
+func TestCLI_MixedFormatPrefixes(t *testing.T) {
+	// Test mixing two DIFFERENT formats: simple-json and handelsbanken-xlsx
+	tmpDir := t.TempDir()
+
+	// First file: ServiceA in simple-json format
+	jsonData := `{"transactions": [
+		{"date": "2025-01-15", "text": "ServiceA", "amount": -50.00},
+		{"date": "2025-02-15", "text": "ServiceA", "amount": -50.00},
+		{"date": "2025-03-15", "text": "ServiceA", "amount": -50.00}
+	]}`
+	jsonPath := filepath.Join(tmpDir, "source.json")
+	os.WriteFile(jsonPath, []byte(jsonData), 0644)
+
+	// Second file: ServiceB in handelsbanken-xlsx format
+	xlsxPath := filepath.Join(tmpDir, "source.xlsx")
+	createTestXLSX(t, xlsxPath, [][]string{
+		{"2025-01-20", "ServiceB", "-75.00"},
+		{"2025-02-20", "ServiceB", "-75.00"},
+		{"2025-03-20", "ServiceB", "-75.00"},
+	})
+
+	// Mix different formats using prefix syntax
+	result := runCLIJSON(t, "simple-json:"+jsonPath, "handelsbanken-xlsx:"+xlsxPath)
+
+	if result.Summary.Count != 2 {
+		t.Errorf("expected 2 subscriptions from mixed format files, got %d", result.Summary.Count)
+	}
+
+	names := make(map[string]bool)
+	for _, sub := range result.Subscriptions {
+		names[sub.Name] = true
+	}
+
+	if !names["ServiceA"] {
+		t.Error("expected ServiceA subscription (from simple-json)")
+	}
+	if !names["ServiceB"] {
+		t.Error("expected ServiceB subscription (from handelsbanken-xlsx)")
+	}
+}
+
+func TestCLI_MixedPrefixAndSourceFlag(t *testing.T) {
+	// Test mixing prefix syntax with --source fallback
+	tmpDir := t.TempDir()
+
+	// File with explicit prefix
+	data1 := `{"transactions": [
+		{"date": "2025-01-15", "text": "ServiceA", "amount": -50.00},
+		{"date": "2025-02-15", "text": "ServiceA", "amount": -50.00},
+		{"date": "2025-03-15", "text": "ServiceA", "amount": -50.00}
+	]}`
+
+	// File relying on --source fallback
+	data2 := `{"transactions": [
+		{"date": "2025-01-20", "text": "ServiceB", "amount": -75.00},
+		{"date": "2025-02-20", "text": "ServiceB", "amount": -75.00},
+		{"date": "2025-03-20", "text": "ServiceB", "amount": -75.00}
+	]}`
+
+	path1 := filepath.Join(tmpDir, "explicit.json")
+	path2 := filepath.Join(tmpDir, "fallback.json")
+	os.WriteFile(path1, []byte(data1), 0644)
+	os.WriteFile(path2, []byte(data2), 0644)
+
+	// First file uses prefix, second relies on --source
+	result := runCLIJSON(t, "--source", "simple-json", "simple-json:"+path1, path2)
+
+	if result.Summary.Count != 2 {
+		t.Errorf("expected 2 subscriptions, got %d", result.Summary.Count)
 	}
 }
