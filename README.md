@@ -282,17 +282,26 @@ go build .
 ## Output Example
 
 ```
-Found 12 subscriptions (12 active, 0 stopped)
+$ ./subscription-detector simple-json:examples/transactions.json --config examples/config.yaml --show all
 
-╭──────────────────┬────────────────────┬────────┬─────┬────────────┬────────────────┬────────────┬──────────╮
-│ Name             │ Description        │ Status │ Day │ Started    │ Last Seen      │ Monthly    │ Yearly   │
-├──────────────────┼────────────────────┼────────┼─────┼────────────┼────────────────┼────────────┼──────────┤
-│ NETFLIX.COM      │ Netflix            │ ACTIVE │ ~4  │ 2025-01-07 │ 2026-01-05     │     199 kr │  2388 kr │
-│ Spotify          │                    │ ACTIVE │ ~14 │ 2025-01-15 │ 2026-01-12     │ 169-219 kr │  2198 kr │
-│ Google Workspace │ Google Workspace   │ ACTIVE │ ~2  │ 2025-01-03 │ 2026-01-02     │   64-76 kr │   807 kr │
-├──────────────────┼────────────────────┼────────┼─────┼────────────┼────────────────┼────────────┼──────────┤
-│                  │                    │        │     │            │ TOTAL (ACTIVE) │   4637 KR  │ 55641 KR │
-╰──────────────────┴────────────────────┴────────┴─────┴────────────┴────────────────┴────────────┴──────────╯
+Loaded 27 transactions from examples/transactions.json
+Total: 27 transactions from 1 file(s)
+Data range: 2025-01-02 to 2025-06-12
+Complete months: 5
+
+Found 4 subscriptions (3 active, 1 stopped)
+Showing: all
+
+╭──────────────────┬──────────────────┬──────────────────────────┬─────────┬─────┬────────────┬────────────────┬────────────┬─────────╮
+│ Name             │ Description      │ Tags                     │ Status  │ Day │ Started    │ Last Seen      │ Monthly    │ Yearly  │
+├──────────────────┼──────────────────┼──────────────────────────┼─────────┼─────┼────────────┼────────────────┼────────────┼─────────┤
+│ Google Workspace │ Google Workspace │ work, productivity       │ ACTIVE  │ ~2  │ 2025-01-02 │ 2025-06-02     │   72-76 kr │  912 kr │
+│ GYM MEMBERSHIP   │ Fitness Center   │ health                   │ STOPPED │ ~20 │ 2025-01-20 │ 2025-03-20     │     399 kr │       - │
+│ NETFLIX.COM      │ Netflix          │ entertainment, streaming │ ACTIVE  │ ~5  │ 2025-01-05 │ 2025-06-05     │     199 kr │ 2388 kr │
+│ Spotify          │                  │ entertainment, music     │ ACTIVE  │ ~12 │ 2025-01-12 │ 2025-06-12     │ 169-179 kr │ 2148 kr │
+├──────────────────┼──────────────────┼──────────────────────────┼─────────┼─────┼────────────┼────────────────┼────────────┼─────────┤
+│                  │                  │                          │         │     │            │ TOTAL (ACTIVE) │ 454 KR     │ 5448 KR │
+╰──────────────────┴──────────────────┴──────────────────────────┴─────────┴─────┴────────────┴────────────────┴────────────┴─────────╯
 ```
 
 ## License
