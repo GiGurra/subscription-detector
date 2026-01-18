@@ -2,6 +2,19 @@
 
 A CLI tool that analyzes bank transaction exports to detect recurring monthly subscriptions. It identifies active and stopped subscriptions, calculates monthly/yearly costs, and helps you understand your recurring expenses.
 
+```
+╭──────────────────┬──────────────────┬──────────────────────────┬─────────┬─────┬────────────┬────────────┬─────────╮
+│ Name             │ Description      │ Tags                     │ Status  │ Day │ Last Seen  │ Monthly    │ Yearly  │
+├──────────────────┼──────────────────┼──────────────────────────┼─────────┼─────┼────────────┼────────────┼─────────┤
+│ Google Workspace │ Google Workspace │ work, productivity       │ ACTIVE  │ ~2  │ 2025-06-02 │   72-76 kr │  912 kr │
+│ GYM MEMBERSHIP   │ Fitness Center   │ health                   │ STOPPED │ ~20 │ 2025-03-20 │     399 kr │       - │
+│ NETFLIX.COM      │ Netflix          │ entertainment, streaming │ ACTIVE  │ ~5  │ 2025-06-05 │     199 kr │ 2388 kr │
+│ Spotify          │                  │ entertainment, music     │ ACTIVE  │ ~12 │ 2025-06-12 │ 169-179 kr │ 2148 kr │
+├──────────────────┼──────────────────┼──────────────────────────┼─────────┼─────┼────────────┼────────────┼─────────┤
+│                  │                  │                          │         │     │            │ 454 KR     │ 5448 KR │
+╰──────────────────┴──────────────────┴──────────────────────────┴─────────┴─────┴────────────┴────────────┴─────────╯
+```
+
 ## Features
 
 - **Automatic Detection**: Identifies subscriptions based on recurring monthly payments with similar amounts
