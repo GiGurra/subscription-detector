@@ -46,6 +46,9 @@ exclude:
   - "Tokyo Ramen"           # Simple pattern
   - pattern: "A J Städ"     # With time bounds
     before: "2026-01-01"
+
+# Currency for amount formatting (auto-detected from locale if not set)
+currency: USD
 ```
 
 ## Sections
@@ -141,3 +144,30 @@ exclude:
   - pattern: "A J Städ"
     before: "2026-01-01"  # Only exclude before this date
 ```
+
+### currency
+
+Set the currency code for amount formatting:
+
+```yaml
+currency: USD
+```
+
+If not specified, the currency is auto-detected from system locale environment variables (LC_MONETARY, LC_ALL, LANG), falling back to SEK.
+
+**Supported currencies:**
+
+| Code | Symbol | Format Example |
+|------|--------|----------------|
+| SEK  | kr     | 1 234 kr       |
+| USD  | $      | $1,234         |
+| EUR  | €      | 1.234 €        |
+| GBP  | £      | £1,234         |
+| NOK  | kr     | 1 234 kr       |
+| DKK  | kr     | 1 234 kr       |
+| CHF  | CHF    | 1.234 CHF      |
+| JPY  | ¥      | ¥1,234         |
+| CAD  | $      | $1,234         |
+| AUD  | $      | $1,234         |
+
+You can also override via CLI: `--currency EUR`

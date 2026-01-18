@@ -14,6 +14,7 @@ CLI tool to detect recurring monthly subscriptions from bank transaction exports
 │   ├── parser_handelsbanken.go       # Handelsbanken XLSX parser
 │   ├── parser_simple_json.go         # Simple JSON parser
 │   ├── config.go                     # YAML config: descriptions, groups, known, exclude
+│   ├── currency.go                   # Currency formatting with locale support (x/text)
 │   ├── suggest.go                    # Group suggestion algorithm (--suggest-groups)
 │   └── output.go                     # Output formatting (table, JSON)
 ```
@@ -51,6 +52,9 @@ go test -v .
 
 # Generate config template
 ./subscription-detector --source handelsbanken-xlsx tx.xlsx --init-config config.yaml
+
+# Use a specific currency (overrides locale detection)
+./subscription-detector --currency USD simple-json:transactions.json
 ```
 
 ## Config File Format (YAML)
@@ -91,6 +95,10 @@ exclude:
   - "Tokyo Ramen"           # Simple pattern (always)
   - pattern: "A J Städ"     # Time-based exclusion
     before: "2026-01-01"
+
+# Currency code for formatting (auto-detected from system locale if not set)
+# Supported: SEK, USD, EUR, GBP, NOK, DKK, CHF, JPY, CAD, AUD
+currency: SEK
 ```
 
 ## Detection Algorithm
@@ -111,6 +119,7 @@ exclude:
 - `github.com/jedib0t/go-pretty/v6` - Table rendering with colors
 - `github.com/xuri/excelize/v2` - XLSX parsing
 - `gopkg.in/yaml.v3` - Config file parsing
+- `golang.org/x/text` - Locale-aware currency formatting
 
 ## Notes
 

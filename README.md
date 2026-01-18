@@ -67,6 +67,7 @@ go build .
 Flags:
   -s, --source string        Default format (or use format:path syntax)
   -c, --config string        Path to config file (YAML)
+      --currency string      Currency code (e.g., USD, EUR, SEK)
   -i, --init-config string   Generate config template and save to path
       --show string          Which subscriptions to show: active, stopped, all (default "active")
       --sort string          Sort field: name, description, amount (default "name")
@@ -85,6 +86,9 @@ Flags:
 
 # Use stricter tolerance (10% max price change)
 ./subscription-detector --source handelsbanken-xlsx tx.xlsx --tolerance 0.10
+
+# Display amounts in USD instead of auto-detected currency
+./subscription-detector --currency USD simple-json:transactions.json
 
 # Generate a config template from detected subscriptions
 ./subscription-detector --source handelsbanken-xlsx tx.xlsx --init-config config.yaml
@@ -203,6 +207,22 @@ exclude:
   - pattern: "Old Service"
     after: "2025-06-01"
 ```
+
+### Currency
+
+Set the currency for amount formatting. If not specified, it's auto-detected from your system locale (LC_MONETARY, LC_ALL, or LANG), falling back to SEK.
+
+```yaml
+currency: USD  # or EUR, GBP, SEK, NOK, DKK, CHF, JPY, CAD, AUD
+```
+
+Currency affects how amounts are displayed:
+- **SEK/NOK/DKK**: `1 234 kr` (space separator, suffix)
+- **USD/GBP/CAD/AUD**: `$1,234` (comma separator, prefix)
+- **EUR**: `1.234 €` (period separator, suffix)
+- **JPY**: `¥1,234` (comma separator, prefix)
+
+You can also override via CLI: `--currency USD`
 
 ## Detection Algorithm
 

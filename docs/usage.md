@@ -54,6 +54,24 @@
 ./subscription-detector --source simple-json data.json --output json
 ```
 
+### Currency
+
+```bash
+# Use a specific currency (overrides locale detection)
+./subscription-detector --currency USD simple-json:data.json
+
+# Currency is also auto-detected from system locale
+LC_MONETARY=en_US.UTF-8 ./subscription-detector simple-json:data.json
+```
+
+Supported currencies: SEK, USD, EUR, GBP, NOK, DKK, CHF, JPY, CAD, AUD
+
+The currency determines:
+- Symbol and position (`$100` vs `100 kr`)
+- Thousand separator (`,` vs ` ` vs `.`)
+
+Priority: CLI flag (`--currency`) > config file (`currency:`) > system locale > SEK default
+
 ## Detection Tuning
 
 ### Tolerance
