@@ -10,7 +10,8 @@ import (
 // DetectSubscriptions analyzes transactions to find recurring monthly subscriptions.
 // It uses filteredTxs (from complete months) for pattern detection,
 // and allTxs to determine the full lifecycle including current month.
-func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRange DateRange) []Subscription {
+// tolerance is the max allowed price change between consecutive months (e.g., 0.35 = 35%).
+func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRange DateRange, tolerance float64) []Subscription {
 	// Group filtered transactions by payee name (case-insensitive)
 	byName := make(map[string][]Transaction)
 	displayNames := make(map[string]string) // lowercase -> display name (most recent)
@@ -60,8 +61,8 @@ func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRa
 			continue
 		}
 
-		// Check if amounts are within ±10% of each other (using complete months data)
-		if !AmountsWithinTolerance(expenses, 0.10) {
+		// Check if amounts are within tolerance of each other (using complete months data)
+		if !AmountsWithinTolerance(expenses, tolerance) {
 			continue
 		}
 

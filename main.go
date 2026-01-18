@@ -8,6 +8,7 @@ import (
 	"github.com/GiGurra/boa/pkg/boa"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/spf13/cobra"
 )
 
 type Params struct {
@@ -16,86 +17,95 @@ type Params struct {
 	Config     string   `descr:"Path to config file (YAML)" optional:"true"`
 	InitConfig string   `descr:"Generate config template and save to path" optional:"true"`
 	Show       string   `descr:"Which subscriptions to show" default:"active" alts:"active,stopped,all" strict:"true"`
+	Tolerance  float64  `descr:"Max price change between months (0.35 = 35%)" default:"0.35"`
 }
 
 func main() {
-	boa.NewCmdT[Params]("subscription-detector").
-		WithShort("Detect ongoing subscriptions from bank transactions").
-		WithLong("Analyzes bank transaction data to identify recurring monthly subscriptions based on similar amounts (±10%) and recurring payee names.").
-		WithRunFunc(func(params *Params) {
-			var transactions []Transaction
-			for _, file := range params.Files {
-				txs, err := ParseHandelsbankenXLSX(file)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error parsing file %s: %v\n", file, err)
-					os.Exit(1)
-				}
-				fmt.Printf("Loaded %d transactions from %s\n", len(txs), file)
-				transactions = append(transactions, txs...)
-			}
+	boa.CmdT[Params]{
+		Use:   "subscription-detector",
+		Short: "Detect ongoing subscriptions from bank transactions",
+		Long:  "Analyzes bank transaction data to identify recurring monthly subscriptions based on similar amounts and recurring payee names.",
+		ParamEnrich: boa.ParamEnricherCombine(
+			boa.ParamEnricherName,
+			boa.ParamEnricherShort,
+			boa.ParamEnricherBool,
+		),
+		RunFunc: run,
+	}.Run()
+}
 
-			fmt.Printf("Total: %d transactions from %d file(s)\n", len(transactions), len(params.Files))
+func run(params *Params, _ *cobra.Command, _ []string) {
+	var transactions []Transaction
+	for _, file := range params.Files {
+		txs, err := ParseHandelsbankenXLSX(file)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing file %s: %v\n", file, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Loaded %d transactions from %s\n", len(txs), file)
+		transactions = append(transactions, txs...)
+	}
 
-			// Check data coverage
-			completeMonths, dateRange := AnalyzeDataCoverage(transactions)
-			fmt.Printf("Data range: %s to %s\n", dateRange.Start.Format("2006-01-02"), dateRange.End.Format("2006-01-02"))
-			fmt.Printf("Complete months: %d\n\n", len(completeMonths))
+	fmt.Printf("Total: %d transactions from %d file(s)\n", len(transactions), len(params.Files))
 
-			if len(completeMonths) < 3 {
-				fmt.Fprintf(os.Stderr, "Warning: Less than 3 complete months of data. Subscription detection may be unreliable.\n\n")
-			}
+	// Check data coverage
+	completeMonths, dateRange := AnalyzeDataCoverage(transactions)
+	fmt.Printf("Data range: %s to %s\n", dateRange.Start.Format("2006-01-02"), dateRange.End.Format("2006-01-02"))
+	fmt.Printf("Complete months: %d\n\n", len(completeMonths))
 
-			// Filter to only complete months for pattern detection
-			filtered := FilterToCompleteMonths(transactions, completeMonths)
-			subscriptions := DetectSubscriptions(filtered, transactions, dateRange)
+	if len(completeMonths) < 3 {
+		fmt.Fprintf(os.Stderr, "Warning: Less than 3 complete months of data. Subscription detection may be unreliable.\n\n")
+	}
 
-			// Load config (from provided path or default location)
-			var cfg *Config
-			configPath := params.Config
-			if configPath == "" {
-				// Try default config path
-				defaultPath := DefaultConfigPath()
-				if _, err := os.Stat(defaultPath); err == nil {
-					configPath = defaultPath
-				}
-			}
-			if configPath != "" {
-				var err error
-				cfg, err = LoadConfig(configPath)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-					os.Exit(1)
-				}
-				fmt.Printf("Loaded config from %s\n\n", configPath)
-			}
+	// Filter to only complete months for pattern detection
+	filtered := FilterToCompleteMonths(transactions, completeMonths)
+	subscriptions := DetectSubscriptions(filtered, transactions, dateRange, params.Tolerance)
 
-			// Apply exclusion filters from config
-			if cfg != nil {
-				subscriptions = filterSubscriptions(subscriptions, cfg)
-			}
+	// Load config (from provided path or default location)
+	var cfg *Config
+	configPath := params.Config
+	if configPath == "" {
+		// Try default config path
+		defaultPath := DefaultConfigPath()
+		if _, err := os.Stat(defaultPath); err == nil {
+			configPath = defaultPath
+		}
+	}
+	if configPath != "" {
+		var err error
+		cfg, err = LoadConfig(configPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Loaded config from %s\n\n", configPath)
+	}
 
-			// Filter by status based on --show flag
-			subscriptions = filterByStatus(subscriptions, params.Show)
+	// Apply exclusion filters from config
+	if cfg != nil {
+		subscriptions = filterSubscriptions(subscriptions, cfg)
+	}
 
-			// Generate config template if requested
-			if params.InitConfig != "" {
-				template := GenerateConfigTemplate(subscriptions)
-				if err := template.Save(params.InitConfig); err != nil {
-					fmt.Fprintf(os.Stderr, "Error saving config template: %v\n", err)
-					os.Exit(1)
-				}
-				fmt.Printf("Config template saved to %s\n", params.InitConfig)
-				return
-			}
+	// Filter by status based on --show flag
+	subscriptions = filterByStatus(subscriptions, params.Show)
 
-			if len(subscriptions) == 0 {
-				fmt.Println("No subscriptions detected.")
-				return
-			}
+	// Generate config template if requested
+	if params.InitConfig != "" {
+		template := GenerateConfigTemplate(subscriptions)
+		if err := template.Save(params.InitConfig); err != nil {
+			fmt.Fprintf(os.Stderr, "Error saving config template: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Config template saved to %s\n", params.InitConfig)
+		return
+	}
 
-			printSubscriptionSummary(subscriptions, cfg)
-		}).
-		Run()
+	if len(subscriptions) == 0 {
+		fmt.Println("No subscriptions detected.")
+		return
+	}
+
+	printSubscriptionSummary(subscriptions, cfg)
 }
 
 func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {

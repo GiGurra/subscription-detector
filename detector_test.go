@@ -336,7 +336,7 @@ func TestDetectSubscriptions(t *testing.T) {
 	filteredTxs := FilterToCompleteMonths(allTxs, []string{"2025-01", "2025-02", "2025-03"})
 	dateRange := DateRange{Start: date("2025-01-10"), End: date("2025-04-10")}
 
-	subs := DetectSubscriptions(filteredTxs, allTxs, dateRange)
+	subs := DetectSubscriptions(filteredTxs, allTxs, dateRange, 0.10)
 
 	if len(subs) != 1 {
 		t.Fatalf("expected 1 subscription, got %d", len(subs))
@@ -369,7 +369,7 @@ func TestDetectSubscriptions_Stopped(t *testing.T) {
 	filteredTxs := FilterToCompleteMonths(allTxs, []string{"2025-01", "2025-02", "2025-03"})
 	dateRange := DateRange{Start: date("2025-01-15"), End: date("2025-04-20")}
 
-	subs := DetectSubscriptions(filteredTxs, allTxs, dateRange)
+	subs := DetectSubscriptions(filteredTxs, allTxs, dateRange, 0.10)
 
 	if len(subs) != 1 {
 		t.Fatalf("expected 1 subscription, got %d", len(subs))
