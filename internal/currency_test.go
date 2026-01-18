@@ -167,12 +167,16 @@ func TestDetectSystemCurrency(t *testing.T) {
 	origAll := os.Getenv("LC_ALL")
 	origLang := os.Getenv("LANG")
 
+	// Skip OS-level locale detection so tests are predictable across platforms
+	skipSystemLocale = true
+
 	// Cleanup after test
 	defer func() {
 		os.Setenv("LC_MONETARY", origMonetary)
 		os.Setenv("LC_ALL", origAll)
 		os.Setenv("LANG", origLang)
 		resetDetectedLocale()
+		skipSystemLocale = false
 	}()
 
 	tests := []struct {
@@ -268,11 +272,15 @@ func TestDetectSystemCurrency_SetsLocaleForFormatting(t *testing.T) {
 	origAll := os.Getenv("LC_ALL")
 	origLang := os.Getenv("LANG")
 
+	// Skip OS-level locale detection so tests are predictable across platforms
+	skipSystemLocale = true
+
 	defer func() {
 		os.Setenv("LC_MONETARY", origMonetary)
 		os.Setenv("LC_ALL", origAll)
 		os.Setenv("LANG", origLang)
 		resetDetectedLocale()
+		skipSystemLocale = false
 	}()
 
 	// Set Brazilian locale
