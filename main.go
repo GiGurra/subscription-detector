@@ -180,17 +180,22 @@ func hasAnyTag(subTags []string, filterTags []string) bool {
 }
 
 func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription, showFilter string, tagFilter []string, sortField string, sortDir string, cfg *Config) {
-	// Count from all subscriptions (before filtering)
+	// Count from all subscriptions (for summary line)
 	activeCount := 0
 	stoppedCount := 0
-	var totalMonthlyCost float64
-
 	for _, sub := range allSubs {
 		if sub.Status == StatusActive {
 			activeCount++
-			totalMonthlyCost += math.Abs(sub.AvgAmount)
 		} else {
 			stoppedCount++
+		}
+	}
+
+	// Calculate totals from displayed subscriptions only
+	var totalMonthlyCost float64
+	for _, sub := range displaySubs {
+		if sub.Status == StatusActive {
+			totalMonthlyCost += math.Abs(sub.AvgAmount)
 		}
 	}
 	totalYearlyCost := totalMonthlyCost * 12
