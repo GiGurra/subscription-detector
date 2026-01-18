@@ -5,19 +5,41 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+// ExcludeRule represents an exclusion rule with optional time bounds
+type ExcludeRule struct {
+	Pattern string `yaml:"pattern"`
+	Before  string `yaml:"before,omitempty"` // Exclude only before this date (YYYY-MM-DD)
+	After   string `yaml:"after,omitempty"`  // Exclude only after this date (YYYY-MM-DD)
+
+	// compiled fields
+	regex      *regexp.Regexp `yaml:"-"`
+	beforeDate time.Time      `yaml:"-"`
+	afterDate  time.Time      `yaml:"-"`
+}
 
 type Config struct {
 	// Descriptions maps subscription names to custom descriptions
 	Descriptions map[string]string `yaml:"descriptions,omitempty"`
 
-	// Exclude is a list of regex patterns - matching subscriptions are excluded
-	Exclude []string `yaml:"exclude,omitempty"`
+	// Exclude is a list of exclusion rules (can be strings or objects with time bounds)
+	Exclude []yaml.Node `yaml:"exclude,omitempty"`
 
-	// compiled regex patterns (not serialized)
-	excludePatterns []*regexp.Regexp `yaml:"-"`
+	// compiled exclusion rules (not serialized)
+	excludeRules []ExcludeRule `yaml:"-"`
+}
+
+// DefaultConfigPath returns the default config file path (~/.subscription-detector/config.yaml)
+func DefaultConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".subscription-detector", "config.yaml")
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -31,13 +53,46 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config file: %w", err)
 	}
 
-	// Compile exclude patterns
-	for _, pattern := range cfg.Exclude {
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			return nil, fmt.Errorf("invalid exclude pattern %q: %w", pattern, err)
+	// Parse exclude rules (supports both strings and objects)
+	for _, node := range cfg.Exclude {
+		var rule ExcludeRule
+
+		if node.Kind == yaml.ScalarNode {
+			// Simple string pattern
+			rule.Pattern = node.Value
+		} else if node.Kind == yaml.MappingNode {
+			// Object with pattern and optional time bounds
+			if err := node.Decode(&rule); err != nil {
+				return nil, fmt.Errorf("parsing exclude rule: %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("invalid exclude rule format")
 		}
-		cfg.excludePatterns = append(cfg.excludePatterns, re)
+
+		// Compile regex
+		re, err := regexp.Compile(rule.Pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid exclude pattern %q: %w", rule.Pattern, err)
+		}
+		rule.regex = re
+
+		// Parse time bounds
+		if rule.Before != "" {
+			t, err := time.Parse("2006-01-02", rule.Before)
+			if err != nil {
+				return nil, fmt.Errorf("invalid 'before' date %q: %w", rule.Before, err)
+			}
+			rule.beforeDate = t
+		}
+		if rule.After != "" {
+			t, err := time.Parse("2006-01-02", rule.After)
+			if err != nil {
+				return nil, fmt.Errorf("invalid 'after' date %q: %w", rule.After, err)
+			}
+			rule.afterDate = t
+		}
+
+		cfg.excludeRules = append(cfg.excludeRules, rule)
 	}
 
 	return &cfg, nil
@@ -64,15 +119,28 @@ func (c *Config) Save(path string) error {
 	return nil
 }
 
-// ShouldExclude returns true if the subscription name matches any exclude pattern
-func (c *Config) ShouldExclude(name string) bool {
+// ShouldExclude returns true if the subscription matches any exclude rule
+// considering time bounds against the subscription's date range
+func (c *Config) ShouldExclude(sub Subscription) bool {
 	if c == nil {
 		return false
 	}
-	for _, re := range c.excludePatterns {
-		if re.MatchString(name) {
-			return true
+	for _, rule := range c.excludeRules {
+		if !rule.regex.MatchString(sub.Name) {
+			continue
 		}
+
+		// Check time bounds - exclude if subscription falls within the rule's time window
+		// before: exclude subscriptions that ended before this date
+		// after: exclude subscriptions that started after this date
+		if !rule.beforeDate.IsZero() && !sub.LastDate.Before(rule.beforeDate) {
+			continue // Subscription extends past the "before" date, don't exclude
+		}
+		if !rule.afterDate.IsZero() && sub.StartDate.Before(rule.afterDate) {
+			continue // Subscription started before the "after" date, don't exclude
+		}
+
+		return true
 	}
 	return false
 }

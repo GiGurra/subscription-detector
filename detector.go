@@ -3,6 +3,7 @@ package main
 import (
 	"math"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -10,21 +11,27 @@ import (
 // It uses filteredTxs (from complete months) for pattern detection,
 // and allTxs to determine the full lifecycle including current month.
 func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRange DateRange) []Subscription {
-	// Group filtered transactions by payee name (for pattern detection)
+	// Group filtered transactions by payee name (case-insensitive)
 	byName := make(map[string][]Transaction)
+	displayNames := make(map[string]string) // lowercase -> display name (most recent)
 	for _, tx := range filteredTxs {
-		byName[tx.Text] = append(byName[tx.Text], tx)
+		key := strings.ToLower(tx.Text)
+		byName[key] = append(byName[key], tx)
+		displayNames[key] = tx.Text // keeps updating to most recent
 	}
 
 	// Also group all transactions to check latest month
 	allByName := make(map[string][]Transaction)
 	for _, tx := range allTxs {
-		allByName[tx.Text] = append(allByName[tx.Text], tx)
+		key := strings.ToLower(tx.Text)
+		allByName[key] = append(allByName[key], tx)
+		displayNames[key] = tx.Text
 	}
 
 	var subscriptions []Subscription
 
-	for name, txs := range byName {
+	for key, txs := range byName {
+		name := displayNames[key]
 		// Need at least 2 occurrences to be a subscription
 		if len(txs) < 2 {
 			continue
@@ -41,12 +48,19 @@ func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRa
 			return expenses[i].Date.Before(expenses[j].Date)
 		})
 
-		// Check for monthly pattern: one payment per month
-		if !IsMonthlyPattern(expenses) {
+		// Get all transactions for this subscription (including current month)
+		allExpenses := FilterExpenses(allByName[key])
+		sort.Slice(allExpenses, func(i, j int) bool {
+			return allExpenses[i].Date.Before(allExpenses[j].Date)
+		})
+
+		// Check for monthly pattern using ALL transactions
+		// If there are ever 2+ payments in any month, it's not a subscription
+		if !IsMonthlyPattern(allExpenses) {
 			continue
 		}
 
-		// Check if amounts are within ±10% of each other
+		// Check if amounts are within ±10% of each other (using complete months data)
 		if !AmountsWithinTolerance(expenses, 0.10) {
 			continue
 		}
@@ -55,12 +69,6 @@ func DetectSubscriptions(filteredTxs []Transaction, allTxs []Transaction, dateRa
 		avgAmount := CalculateAverageAmount(expenses)
 		minAmount, maxAmount := CalculateAmountRange(expenses)
 		typicalDay := CalculateTypicalDay(expenses)
-
-		// Get all transactions for this subscription (including current month)
-		allExpenses := FilterExpenses(allByName[name])
-		sort.Slice(allExpenses, func(i, j int) bool {
-			return allExpenses[i].Date.Before(allExpenses[j].Date)
-		})
 
 		startDate := allExpenses[0].Date
 		lastDate := allExpenses[len(allExpenses)-1].Date

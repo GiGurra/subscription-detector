@@ -10,9 +10,9 @@ import (
 )
 
 // ParseHandelsbankenXLSX reads transactions from a Handelsbanken Excel export.
-// Expected format:
-// - Row 8: Headers (Reskontradatum, Transaktionsdatum, Text, Belopp, Saldo)
-// - Row 9+: Transaction data
+// Supports two layouts:
+// - Regular account: Reskontradatum, Transaktionsdatum, Text, Belopp, Saldo
+// - Credit card: Reskontradatum, Transaktionsdatum, Text, Belopp (no Saldo, may have empty first column)
 func ParseHandelsbankenXLSX(path string) ([]Transaction, error) {
 	f, err := excelize.OpenFile(path)
 	if err != nil {
@@ -30,33 +30,75 @@ func ParseHandelsbankenXLSX(path string) ([]Transaction, error) {
 		return nil, fmt.Errorf("reading sheet: %w", err)
 	}
 
+	// Find header row and column indices
+	var dateCol, textCol, amountCol int = -1, -1, -1
+	var dataStartRow int = -1
+
+	for i, row := range rows {
+		for j, cell := range row {
+			cell = strings.TrimSpace(cell)
+			switch cell {
+			case "Reskontradatum":
+				dateCol = j
+				dataStartRow = i + 1
+			case "Transaktionsdatum":
+				// Use transaction date if available, prefer over Reskontradatum
+				if dateCol == -1 || j > dateCol {
+					// Keep Reskontradatum as date column
+				}
+			case "Text":
+				textCol = j
+			case "Belopp":
+				amountCol = j
+			}
+		}
+		if dateCol >= 0 && textCol >= 0 && amountCol >= 0 {
+			break
+		}
+	}
+
+	if dateCol < 0 || textCol < 0 || amountCol < 0 {
+		return nil, fmt.Errorf("could not find required columns (Reskontradatum, Text, Belopp)")
+	}
+
 	var transactions []Transaction
-	dataStarted := false
+	for i := dataStartRow; i < len(rows); i++ {
+		row := rows[i]
 
-	for _, row := range rows {
-		if len(row) >= 5 && row[0] == "Reskontradatum" {
-			dataStarted = true
+		// Ensure row has enough columns
+		maxCol := max(dateCol, textCol, amountCol)
+		if len(row) <= maxCol {
 			continue
 		}
 
-		if !dataStarted || len(row) < 4 {
+		dateStr := strings.TrimSpace(row[dateCol])
+		text := strings.TrimSpace(row[textCol])
+		amountStr := strings.TrimSpace(row[amountCol])
+
+		// Skip empty rows
+		if dateStr == "" || text == "" || amountStr == "" {
 			continue
 		}
 
-		date, err := time.Parse("2006-01-02", row[0])
+		// Parse date
+		date, err := time.Parse("2006-01-02", dateStr)
 		if err != nil {
 			continue
 		}
 
-		amountStr := strings.ReplaceAll(row[3], ",", ".")
+		// Parse amount
+		amountStr = strings.ReplaceAll(amountStr, ",", ".")
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
 			continue
 		}
 
+		// Strip "Prel " prefix from pending transactions
+		text = strings.TrimPrefix(text, "Prel ")
+
 		transactions = append(transactions, Transaction{
 			Date:   date,
-			Text:   row[2],
+			Text:   text,
 			Amount: amount,
 		})
 	}

@@ -11,10 +11,10 @@ import (
 )
 
 type Params struct {
-	Source     string `descr:"Data source type" alts:"handelsbanken-xlsx" strict:"true"`
-	File       string `descr:"Path to the transaction file" positional:"true"`
-	Config     string `descr:"Path to config file (YAML)" optional:"true"`
-	InitConfig string `descr:"Generate config template and save to path" optional:"true"`
+	Source     string   `descr:"Data source type" alts:"handelsbanken-xlsx" strict:"true"`
+	Files      []string `descr:"Path(s) to transaction file(s)" positional:"true"`
+	Config     string   `descr:"Path to config file (YAML)" optional:"true"`
+	InitConfig string   `descr:"Generate config template and save to path" optional:"true"`
 }
 
 func main() {
@@ -22,13 +22,18 @@ func main() {
 		WithShort("Detect ongoing subscriptions from bank transactions").
 		WithLong("Analyzes bank transaction data to identify recurring monthly subscriptions based on similar amounts (±10%) and recurring payee names.").
 		WithRunFunc(func(params *Params) {
-			transactions, err := ParseHandelsbankenXLSX(params.File)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error parsing file: %v\n", err)
-				os.Exit(1)
+			var transactions []Transaction
+			for _, file := range params.Files {
+				txs, err := ParseHandelsbankenXLSX(file)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error parsing file %s: %v\n", file, err)
+					os.Exit(1)
+				}
+				fmt.Printf("Loaded %d transactions from %s\n", len(txs), file)
+				transactions = append(transactions, txs...)
 			}
 
-			fmt.Printf("Loaded %d transactions\n", len(transactions))
+			fmt.Printf("Total: %d transactions from %d file(s)\n", len(transactions), len(params.Files))
 
 			// Check data coverage
 			completeMonths, dateRange := AnalyzeDataCoverage(transactions)
@@ -43,15 +48,24 @@ func main() {
 			filtered := FilterToCompleteMonths(transactions, completeMonths)
 			subscriptions := DetectSubscriptions(filtered, transactions, dateRange)
 
-			// Load config if provided
+			// Load config (from provided path or default location)
 			var cfg *Config
-			if params.Config != "" {
-				cfg, err = LoadConfig(params.Config)
+			configPath := params.Config
+			if configPath == "" {
+				// Try default config path
+				defaultPath := DefaultConfigPath()
+				if _, err := os.Stat(defaultPath); err == nil {
+					configPath = defaultPath
+				}
+			}
+			if configPath != "" {
+				var err error
+				cfg, err = LoadConfig(configPath)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 					os.Exit(1)
 				}
-				fmt.Printf("Loaded config from %s\n\n", params.Config)
+				fmt.Printf("Loaded config from %s\n\n", configPath)
 			}
 
 			// Apply exclusion filters from config
@@ -83,7 +97,7 @@ func main() {
 func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {
 	var result []Subscription
 	for _, sub := range subs {
-		if !cfg.ShouldExclude(sub.Name) {
+		if !cfg.ShouldExclude(sub) {
 			result = append(result, sub)
 		}
 	}
