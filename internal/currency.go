@@ -184,7 +184,10 @@ func (c Currency) getSymbol() string {
 	return c.printer.Sprint(currency.NarrowSymbol(c.unit))
 }
 
-// isPrefix returns true if this currency symbol should be placed before the amount
+// isPrefix returns true if this currency symbol should be placed before the amount.
+// Note: golang.org/x/text/currency doesn't implement symbol positioning from CLDR patterns
+// (see TODO in x/text/internal/number/pattern.go for ¤ handling). Until that's fixed,
+// we maintain this list of prefix currencies manually.
 func (c Currency) isPrefix() bool {
 	switch c.Code {
 	case "USD", "GBP", "JPY", "CAD", "AUD", "MXN", "HKD", "SGD", "NZD", "ZAR":
