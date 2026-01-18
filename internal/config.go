@@ -161,6 +161,9 @@ type Config struct {
 	// Exclude is a list of exclusion rules (can be strings or objects with time bounds)
 	Exclude []yaml.Node `yaml:"exclude,omitempty"`
 
+	// Currency is the currency code for formatting (e.g., "SEK", "USD", "EUR")
+	Currency string `yaml:"currency,omitempty"`
+
 	// compiled exclusion rules (not serialized)
 	excludeRules []ExcludeRule `yaml:"-"`
 }

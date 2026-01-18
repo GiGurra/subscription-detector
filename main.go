@@ -21,6 +21,7 @@ type Params struct {
 	Tolerance     float64  `descr:"Max price change between months (0.35 = 35%)" default:"0.35"`
 	SuggestGroups bool     `descr:"Analyze and suggest potential transaction groups" optional:"true"`
 	Tags          []string `descr:"Filter by tags (e.g., entertainment, insurance)" optional:"true"`
+	Currency      string   `descr:"Currency code (e.g., USD, EUR, SEK)" optional:"true"`
 }
 
 func main() {
@@ -101,6 +102,19 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 		}
 	}
 
+	// Resolve currency with precedence: CLI > config > locale > "SEK"
+	currencyCode := params.Currency
+	if currencyCode == "" && cfg != nil {
+		currencyCode = cfg.Currency
+	}
+	if currencyCode == "" {
+		currencyCode = internal.DetectSystemCurrency()
+	}
+	if currencyCode == "" {
+		currencyCode = "SEK"
+	}
+	currency := internal.GetCurrency(currencyCode)
+
 	// Apply grouping from config (combines transactions with different names into one)
 	transactions, _ = cfg.ApplyGroups(transactions)
 
@@ -149,7 +163,7 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 
 	if len(subscriptions) == 0 {
 		if params.Output == "json" {
-			internal.PrintSubscriptionsJSON(os.Stdout, nil, cfg)
+			internal.PrintSubscriptionsJSON(os.Stdout, nil, cfg, currency)
 		} else {
 			fmt.Println("No subscriptions detected.")
 		}
@@ -165,13 +179,14 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 	}
 
 	if params.Output == "json" {
-		internal.PrintSubscriptionsJSON(os.Stdout, displaySubs, cfg)
+		internal.PrintSubscriptionsJSON(os.Stdout, displaySubs, cfg, currency)
 	} else {
 		opts := internal.OutputOptions{
 			ShowFilter: params.Show,
 			TagFilter:  params.Tags,
 			SortField:  params.Sort,
 			SortDir:    params.SortDir,
+			Currency:   currency,
 		}
 		internal.PrintSubscriptionsTable(os.Stdout, subscriptions, displaySubs, opts, cfg)
 	}

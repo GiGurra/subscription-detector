@@ -18,6 +18,7 @@ type OutputOptions struct {
 	TagFilter  []string
 	SortField  string
 	SortDir    string
+	Currency   Currency
 }
 
 // JSONOutput is the root JSON output object
@@ -31,6 +32,7 @@ type JSONSummary struct {
 	Count        int     `json:"count"`
 	MonthlyTotal float64 `json:"monthly_total"`
 	YearlyTotal  float64 `json:"yearly_total"`
+	Currency     string  `json:"currency"`
 }
 
 // JSONSubscription is the JSON output format for a subscription
@@ -49,7 +51,7 @@ type JSONSubscription struct {
 }
 
 // PrintSubscriptionsJSON outputs subscriptions in JSON format
-func PrintSubscriptionsJSON(w io.Writer, subs []Subscription, cfg *Config) {
+func PrintSubscriptionsJSON(w io.Writer, subs []Subscription, cfg *Config, currency Currency) {
 	var subscriptions []JSONSubscription
 	var monthlyTotal float64
 
@@ -87,6 +89,7 @@ func PrintSubscriptionsJSON(w io.Writer, subs []Subscription, cfg *Config) {
 			Count:        len(subscriptions),
 			MonthlyTotal: monthlyTotal,
 			YearlyTotal:  monthlyTotal * 12,
+			Currency:     currency.Code,
 		},
 	}
 
@@ -189,13 +192,13 @@ func PrintSubscriptionsTable(w io.Writer, allSubs []Subscription, displaySubs []
 			status = text.FgRed.Sprint("STOPPED")
 		}
 
-		monthlyStr := fmt.Sprintf("%.0f kr", math.Abs(sub.AvgAmount))
+		monthlyStr := opts.Currency.Format(math.Abs(sub.AvgAmount))
 		if sub.MinAmount != sub.MaxAmount {
-			monthlyStr = fmt.Sprintf("%.0f-%.0f kr", sub.MinAmount, sub.MaxAmount)
+			monthlyStr = opts.Currency.FormatRange(sub.MinAmount, sub.MaxAmount)
 		}
 
 		yearlyAmount := math.Abs(sub.LatestAmount) * 12
-		yearlyStr := fmt.Sprintf("%.0f kr", yearlyAmount)
+		yearlyStr := opts.Currency.Format(yearlyAmount)
 		if sub.Status == StatusStopped {
 			yearlyStr = text.FgHiBlack.Sprint("-")
 		}
@@ -233,11 +236,12 @@ func PrintSubscriptionsTable(w io.Writer, allSubs []Subscription, displaySubs []
 	if hasTags {
 		footer = append(footer, "")
 	}
-	footer = append(footer, "", "", "", text.Bold.Sprint("Total (active)"), text.Bold.Sprintf("%.0f kr", totalMonthlyCost), text.Bold.Sprintf("%.0f kr", totalYearlyCost))
+	footer = append(footer, "", "", "", text.Bold.Sprint("Total (active)"), text.Bold.Sprint(opts.Currency.Format(totalMonthlyCost)), text.Bold.Sprint(opts.Currency.Format(totalYearlyCost)))
 	t.AppendFooter(footer)
 
 	t.SetStyle(table.StyleRounded)
 	t.Style().Format.Header = text.FormatDefault
+	t.Style().Format.Footer = text.FormatDefault
 
 	// Right-align Monthly and Yearly columns (last two)
 	colCount := len(header)
