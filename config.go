@@ -36,6 +36,9 @@ type Config struct {
 	// Descriptions maps subscription names to custom descriptions
 	Descriptions map[string]string `yaml:"descriptions,omitempty"`
 
+	// Tags maps subscription names to a list of tags (e.g., "entertainment", "utilities")
+	Tags map[string][]string `yaml:"tags,omitempty"`
+
 	// Groups allows combining multiple transaction patterns into one subscription
 	Groups []Group `yaml:"groups,omitempty"`
 
@@ -175,6 +178,14 @@ func (c *Config) GetDescription(name string) string {
 		return ""
 	}
 	return c.Descriptions[name]
+}
+
+// GetTags returns the tags for a subscription, or nil if none
+func (c *Config) GetTags(name string) []string {
+	if c == nil || c.Tags == nil {
+		return nil
+	}
+	return c.Tags[name]
 }
 
 // ApplyGroups transforms transactions by replacing names that match group patterns

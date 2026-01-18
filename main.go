@@ -23,6 +23,7 @@ type Params struct {
 	SortDir       string   `descr:"Sort direction" default:"asc" alts:"asc,desc" strict:"true"`
 	Tolerance     float64  `descr:"Max price change between months (0.35 = 35%)" default:"0.35"`
 	SuggestGroups bool     `descr:"Analyze and suggest potential transaction groups" optional:"true"`
+	Tags          []string `descr:"Filter by tags (e.g., entertainment, insurance)" optional:"true"`
 }
 
 func main() {
@@ -120,7 +121,12 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 	// Filter by status for display (but show total counts first)
 	displaySubs := filterByStatus(subscriptions, params.Show)
 
-	printSubscriptionSummary(subscriptions, displaySubs, params.Show, params.Sort, params.SortDir, cfg)
+	// Filter by tags if specified
+	if len(params.Tags) > 0 {
+		displaySubs = filterByTags(displaySubs, params.Tags, cfg)
+	}
+
+	printSubscriptionSummary(subscriptions, displaySubs, params.Show, params.Tags, params.Sort, params.SortDir, cfg)
 }
 
 func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {
@@ -148,7 +154,32 @@ func filterByStatus(subs []Subscription, show string) []Subscription {
 	return result
 }
 
-func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription, showFilter string, sortField string, sortDir string, cfg *Config) {
+func filterByTags(subs []Subscription, tags []string, cfg *Config) []Subscription {
+	if cfg == nil || len(tags) == 0 {
+		return subs
+	}
+	var result []Subscription
+	for _, sub := range subs {
+		subTags := cfg.GetTags(sub.Name)
+		if hasAnyTag(subTags, tags) {
+			result = append(result, sub)
+		}
+	}
+	return result
+}
+
+func hasAnyTag(subTags []string, filterTags []string) bool {
+	for _, ft := range filterTags {
+		for _, st := range subTags {
+			if strings.EqualFold(st, ft) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription, showFilter string, tagFilter []string, sortField string, sortDir string, cfg *Config) {
 	// Count from all subscriptions (before filtering)
 	activeCount := 0
 	stoppedCount := 0
@@ -166,7 +197,11 @@ func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription
 
 	fmt.Printf("Found %d subscriptions (%d active, %d stopped)\n",
 		len(allSubs), activeCount, stoppedCount)
-	fmt.Printf("Showing: %s\n\n", showFilter)
+	showingStr := showFilter
+	if len(tagFilter) > 0 {
+		showingStr += fmt.Sprintf(", tags: %s", strings.Join(tagFilter, ", "))
+	}
+	fmt.Printf("Showing: %s\n\n", showingStr)
 
 	// Sort displayed subscriptions
 	sort.Slice(displaySubs, func(i, j int) bool {
@@ -198,22 +233,33 @@ func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 
-	// Check if any displayed subscription has a description
+	// Check which optional columns to show
 	hasDescriptions := false
+	hasTags := false
 	if cfg != nil {
 		for _, sub := range displaySubs {
 			if cfg.GetDescription(sub.Name) != "" {
 				hasDescriptions = true
+			}
+			if len(cfg.GetTags(sub.Name)) > 0 {
+				hasTags = true
+			}
+			if hasDescriptions && hasTags {
 				break
 			}
 		}
 	}
 
+	// Build header dynamically
+	header := table.Row{"Name"}
 	if hasDescriptions {
-		t.AppendHeader(table.Row{"Name", "Description", "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly"})
-	} else {
-		t.AppendHeader(table.Row{"Name", "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly"})
+		header = append(header, "Description")
 	}
+	if hasTags {
+		header = append(header, "Tags")
+	}
+	header = append(header, "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly")
+	t.AppendHeader(header)
 
 	for _, sub := range displaySubs {
 		status := text.FgGreen.Sprint("ACTIVE")
@@ -234,71 +280,49 @@ func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription
 
 		dayStr := fmt.Sprintf("~%d", sub.TypicalDay)
 
+		// Build row dynamically
+		row := table.Row{sub.Name}
 		if hasDescriptions {
 			desc := ""
 			if cfg != nil {
 				desc = cfg.GetDescription(sub.Name)
 			}
-			t.AppendRow(table.Row{
-				sub.Name,
-				desc,
-				status,
-				dayStr,
-				sub.StartDate.Format("2006-01-02"),
-				sub.LastDate.Format("2006-01-02"),
-				monthlyStr,
-				yearlyStr,
-			})
-		} else {
-			t.AppendRow(table.Row{
-				sub.Name,
-				status,
-				dayStr,
-				sub.StartDate.Format("2006-01-02"),
-				sub.LastDate.Format("2006-01-02"),
-				monthlyStr,
-				yearlyStr,
-			})
+			row = append(row, desc)
 		}
+		if hasTags {
+			tagsStr := ""
+			if cfg != nil {
+				tags := cfg.GetTags(sub.Name)
+				tagsStr = strings.Join(tags, ", ")
+			}
+			row = append(row, tagsStr)
+		}
+		row = append(row, status, dayStr, sub.StartDate.Format("2006-01-02"), sub.LastDate.Format("2006-01-02"), monthlyStr, yearlyStr)
+		t.AppendRow(row)
 	}
 
 	t.AppendSeparator()
+
+	// Build footer dynamically (empty cells for optional columns)
+	footer := table.Row{""}
 	if hasDescriptions {
-		t.AppendFooter(table.Row{
-			"",
-			"",
-			"",
-			"",
-			"",
-			text.Bold.Sprint("Total (active)"),
-			text.Bold.Sprintf("%.0f kr", totalMonthlyCost),
-			text.Bold.Sprintf("%.0f kr", totalYearlyCost),
-		})
-	} else {
-		t.AppendFooter(table.Row{
-			"",
-			"",
-			"",
-			"",
-			text.Bold.Sprint("Total (active)"),
-			text.Bold.Sprintf("%.0f kr", totalMonthlyCost),
-			text.Bold.Sprintf("%.0f kr", totalYearlyCost),
-		})
+		footer = append(footer, "")
 	}
+	if hasTags {
+		footer = append(footer, "")
+	}
+	footer = append(footer, "", "", "", text.Bold.Sprint("Total (active)"), text.Bold.Sprintf("%.0f kr", totalMonthlyCost), text.Bold.Sprintf("%.0f kr", totalYearlyCost))
+	t.AppendFooter(footer)
 
 	t.SetStyle(table.StyleRounded)
 	t.Style().Format.Header = text.FormatDefault
-	if hasDescriptions {
-		t.SetColumnConfigs([]table.ColumnConfig{
-			{Number: 7, Align: text.AlignRight},
-			{Number: 8, Align: text.AlignRight},
-		})
-	} else {
-		t.SetColumnConfigs([]table.ColumnConfig{
-			{Number: 6, Align: text.AlignRight},
-			{Number: 7, Align: text.AlignRight},
-		})
-	}
+
+	// Right-align Monthly and Yearly columns (last two)
+	colCount := len(header)
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: colCount - 1, Align: text.AlignRight},
+		{Number: colCount, Align: text.AlignRight},
+	})
 
 	t.Render()
 }

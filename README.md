@@ -46,6 +46,9 @@ Flags:
   -c, --config string        Path to config file (YAML)
   -i, --init-config string   Generate config template and save to path
       --show string          Which subscriptions to show: active, stopped, all (default "active")
+      --sort string          Sort field: name, description, amount (default "name")
+      --sort-dir string      Sort direction: asc, desc (default "asc")
+      --tags strings         Filter by tags (e.g., entertainment, insurance)
   -t, --tolerance float      Max price change between months, e.g., 0.35 = 35% (default 0.35)
       --suggest-groups       Analyze and suggest potential transaction groups
   -h, --help                 help for subscription-detector
@@ -79,6 +82,13 @@ descriptions:
   NETFLIX.COM: "Netflix"
   GOOGLE *YouTub: "YouTube Premium"
   K*svd.se: "Svenska Dagbladet"
+
+# Tags for categorizing subscriptions
+tags:
+  NETFLIX.COM: [entertainment]
+  GOOGLE *YouTub: [entertainment]
+  Spotify: [entertainment]
+  K*svd.se: [news]
 
 # Group transactions with different names into one subscription
 groups:
@@ -132,6 +142,29 @@ Found 1 potential group(s):
         patterns:
           - "^Spotify"
 ```
+
+### Tags
+
+Categorize subscriptions with tags and filter by them:
+
+```yaml
+tags:
+  NETFLIX.COM: [entertainment]
+  Spotify: [entertainment, music]
+  K*svd.se: [news]
+```
+
+Filter by tags:
+
+```bash
+# Show only entertainment subscriptions
+./subscription-detector --source handelsbanken-xlsx tx.xlsx --tags entertainment
+
+# Show multiple tag categories
+./subscription-detector --source handelsbanken-xlsx tx.xlsx --tags entertainment --tags insurance
+```
+
+Tags are displayed in a dedicated column when any subscription has tags configured.
 
 ### Time-based Exclusions
 
