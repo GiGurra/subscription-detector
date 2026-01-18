@@ -34,6 +34,38 @@ Note: Without config, Spotify isn't detected (varying transaction IDs), and the 
 
 ### With configuration
 
+The example config (`examples/config.yaml`):
+
+```yaml
+descriptions:
+  NETFLIX.COM: "Netflix"
+  GYM MEMBERSHIP: "Fitness Center"
+  Google Workspace: "Google Workspace"
+
+tags:
+  NETFLIX.COM: [entertainment, streaming]
+  Spotify: [entertainment, music]
+  Google Workspace: [work, productivity]
+  GYM MEMBERSHIP: [health]
+
+groups:
+  - name: "Spotify"
+    patterns:
+      - "^Spotify"  # Matches "Spotify P3A8AC", "Spotify P3B5D9", etc.
+  - name: "Google Workspace"
+    patterns:
+      - "GOOGLE\\*GSUITE"
+      - "Google GSUITE_"
+      - "Google Workspace"
+
+exclude:
+  - "McDonald's"
+  - "Flowers Shop"
+  - "Birthday Gift"
+```
+
+Run with config:
+
 ```bash
 subscription-detector --source simple-json examples/transactions.json --config examples/config.yaml
 ```
