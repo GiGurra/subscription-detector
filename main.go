@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 
 	"github.com/GiGurra/boa/pkg/boa"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 type Params struct {
@@ -53,45 +54,73 @@ func main() {
 func printSubscriptionSummary(subscriptions []Subscription) {
 	activeCount := 0
 	stoppedCount := 0
+	var totalMonthlyCost float64
+
 	for _, sub := range subscriptions {
 		if sub.Status == StatusActive {
 			activeCount++
+			totalMonthlyCost += math.Abs(sub.AvgAmount)
 		} else {
 			stoppedCount++
 		}
 	}
+	totalYearlyCost := totalMonthlyCost * 12
 
-	fmt.Printf("Found %d subscriptions (%d active, %d stopped)\n\n", len(subscriptions), activeCount, stoppedCount)
+	fmt.Printf("Found %d subscriptions (%d active, %d stopped)\n\n",
+		len(subscriptions), activeCount, stoppedCount)
 
-	// Print header
-	fmt.Printf("%-25s  %-8s  %-12s  %-12s  %-15s  %s\n",
-		"NAME", "STATUS", "STARTED", "LAST SEEN", "AMOUNT", "OCCURRENCES")
-	fmt.Println(strings.Repeat("-", 95))
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Name", "Status", "Day", "Started", "Last Seen", "Monthly", "Yearly"})
 
 	for _, sub := range subscriptions {
-		status := "ACTIVE"
+		status := text.FgGreen.Sprint("ACTIVE")
 		if sub.Status == StatusStopped {
-			status = "STOPPED"
+			status = text.FgRed.Sprint("STOPPED")
 		}
 
-		amountStr := fmt.Sprintf("%.0f kr", math.Abs(sub.AvgAmount))
+		monthlyStr := fmt.Sprintf("%.0f kr", math.Abs(sub.AvgAmount))
 		if sub.MinAmount != sub.MaxAmount {
-			amountStr = fmt.Sprintf("%.0f-%.0f kr", sub.MinAmount, sub.MaxAmount)
+			monthlyStr = fmt.Sprintf("%.0f-%.0f kr", sub.MinAmount, sub.MaxAmount)
 		}
 
-		fmt.Printf("%-25s  %-8s  %-12s  %-12s  %-15s  %d\n",
-			truncate(sub.Name, 25),
+		yearlyAmount := math.Abs(sub.AvgAmount) * 12
+		yearlyStr := fmt.Sprintf("%.0f kr", yearlyAmount)
+		if sub.Status == StatusStopped {
+			yearlyStr = text.FgHiBlack.Sprint("-")
+		}
+
+		dayStr := fmt.Sprintf("~%d", sub.TypicalDay)
+
+		t.AppendRow(table.Row{
+			sub.Name,
 			status,
+			dayStr,
 			sub.StartDate.Format("2006-01-02"),
 			sub.LastDate.Format("2006-01-02"),
-			amountStr,
-			len(sub.Transactions))
+			monthlyStr,
+			yearlyStr,
+		})
 	}
-}
 
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-2] + ".."
+	t.AppendSeparator()
+	t.AppendFooter(table.Row{
+		"",
+		"",
+		"",
+		"",
+		text.Bold.Sprint("Total (active)"),
+		text.Bold.Sprintf("%.0f kr", totalMonthlyCost),
+		text.Bold.Sprintf("%.0f kr", totalYearlyCost),
+	})
+
+	t.SetStyle(table.StyleRounded)
+	t.Style().Format.Header = text.FormatDefault
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, AutoMerge: false},
+		{Number: 6, Align: text.AlignRight},
+		{Number: 7, Align: text.AlignRight},
+	})
+
+	t.Render()
 }
