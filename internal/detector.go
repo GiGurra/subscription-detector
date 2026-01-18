@@ -292,3 +292,107 @@ func FilterToCompleteMonths(transactions []Transaction, completeMonths []string)
 	}
 	return filtered
 }
+
+// FilterOutMatched returns transactions whose text (case-insensitive) is not in the matched set.
+func FilterOutMatched(transactions []Transaction, matchedTexts map[string]bool) []Transaction {
+	if len(matchedTexts) == 0 {
+		return transactions
+	}
+
+	var filtered []Transaction
+	for _, tx := range transactions {
+		if !matchedTexts[strings.ToLower(tx.Text)] {
+			filtered = append(filtered, tx)
+		}
+	}
+	return filtered
+}
+
+// DetectKnownSubscriptions finds subscriptions based on configured known patterns.
+// Unlike regular detection, these can match even with a single occurrence and
+// include transactions from the current (incomplete) month.
+// Returns known subscriptions and the set of transaction texts that matched (to exclude from regular detection).
+func DetectKnownSubscriptions(allTxs []Transaction, dateRange DateRange, cfg *Config) ([]Subscription, map[string]bool) {
+	matchedTexts := make(map[string]bool) // tracks which transaction texts matched known patterns
+
+	if cfg == nil || len(cfg.Known) == 0 {
+		return nil, matchedTexts
+	}
+
+	// Group matching transactions by the known subscription pattern
+	type matchGroup struct {
+		pattern string
+		txs     []Transaction
+	}
+	byPattern := make(map[string]*matchGroup)
+
+	for _, tx := range allTxs {
+		// Only consider expenses
+		if tx.Amount >= 0 {
+			continue
+		}
+
+		known := cfg.MatchesKnown(tx)
+		if known == nil {
+			continue
+		}
+
+		// Mark this text as matched (case-insensitive key)
+		matchedTexts[strings.ToLower(tx.Text)] = true
+
+		if byPattern[known.Pattern] == nil {
+			byPattern[known.Pattern] = &matchGroup{pattern: known.Pattern}
+		}
+		byPattern[known.Pattern].txs = append(byPattern[known.Pattern].txs, tx)
+	}
+
+	var subscriptions []Subscription
+	for _, group := range byPattern {
+		if len(group.txs) == 0 {
+			continue
+		}
+
+		// Sort by date
+		sort.Slice(group.txs, func(i, j int) bool {
+			return group.txs[i].Date.Before(group.txs[j].Date)
+		})
+
+		// Use the most recent transaction text as the display name
+		name := group.txs[len(group.txs)-1].Text
+
+		// Calculate statistics
+		avgAmount := CalculateAverageAmount(group.txs)
+		minAmount, maxAmount := CalculateAmountRange(group.txs)
+		typicalDay := CalculateTypicalDay(group.txs)
+
+		startDate := group.txs[0].Date
+		lastDate := group.txs[len(group.txs)-1].Date
+		latestAmount := group.txs[len(group.txs)-1].Amount
+
+		// Determine status
+		status := DetermineStatus(lastDate, typicalDay, dateRange.End)
+
+		subscriptions = append(subscriptions, Subscription{
+			Name:         name,
+			AvgAmount:    avgAmount,
+			LatestAmount: latestAmount,
+			MinAmount:    minAmount,
+			MaxAmount:    maxAmount,
+			Transactions: group.txs,
+			StartDate:    startDate,
+			LastDate:     lastDate,
+			TypicalDay:   typicalDay,
+			Status:       status,
+		})
+	}
+
+	// Sort: active first, then by amount
+	sort.Slice(subscriptions, func(i, j int) bool {
+		if subscriptions[i].Status != subscriptions[j].Status {
+			return subscriptions[i].Status == StatusActive
+		}
+		return math.Abs(subscriptions[i].AvgAmount) > math.Abs(subscriptions[j].AvgAmount)
+	})
+
+	return subscriptions, matchedTexts
+}

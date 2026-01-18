@@ -5,13 +5,17 @@ CLI tool to detect recurring monthly subscriptions from bank transaction exports
 ## Project Structure
 
 ```
-├── main.go                  # CLI entry point (boa direct API), output formatting (go-pretty)
-├── types.go                 # Common types: Transaction, Subscription, DateRange
-├── detector.go              # Detection logic (bank-agnostic)
-├── detector_test.go         # Tests for detection logic
-├── parser_handelsbanken.go  # Handelsbanken XLSX parser (regular + credit card formats)
-├── config.go                # YAML config: descriptions, groups, exclude rules
-├── suggest.go               # Group suggestion algorithm (--suggest-groups)
+├── main.go                           # CLI entry point (boa direct API)
+├── internal/
+│   ├── types.go                      # Common types: Transaction, Subscription, DateRange
+│   ├── detector.go                   # Detection logic (bank-agnostic)
+│   ├── detector_test.go              # Tests for detection logic
+│   ├── parser.go                     # Parser registry and format:path parsing
+│   ├── parser_handelsbanken.go       # Handelsbanken XLSX parser
+│   ├── parser_simple_json.go         # Simple JSON parser
+│   ├── config.go                     # YAML config: descriptions, groups, known, exclude
+│   ├── suggest.go                    # Group suggestion algorithm (--suggest-groups)
+│   └── output.go                     # Output formatting (table, JSON)
 ```
 
 ## Build & Test
@@ -68,6 +72,21 @@ groups:
     patterns:
       - "^Spotify"
 
+# Disable built-in known subscription patterns (Netflix, Spotify, etc.)
+# Default: true (built-in patterns are included)
+use_default_known: false
+
+# Known subscriptions are detected immediately (even with 1 occurrence, including current month)
+# These are added to the built-in defaults (unless use_default_known: false)
+known:
+  - pattern: "NewStreamingService"     # Just a name pattern
+  - pattern: "PremiumApp"              # With optional amount range
+    min_amount: 49
+    max_amount: 99
+  - pattern: "OldService"              # With date filters
+    after: "2024-01-01"
+    before: "2025-06-01"
+
 exclude:
   - "Tokyo Ramen"           # Simple pattern (always)
   - pattern: "A J Städ"     # Time-based exclusion
@@ -78,12 +97,13 @@ exclude:
 
 1. Parse transactions from bank export(s)
 2. Load config, apply groups (rename matching transactions)
-3. Filter to complete months only (incomplete current month excluded from pattern detection)
-4. Group by payee name (case-insensitive)
-5. Require 2+ occurrences, expenses only (negative amounts)
-6. Check monthly pattern: exactly 1 payment per calendar month (across ALL data)
-7. Check amount tolerance: configurable % between consecutive payments (default 35%)
-8. Determine status: ACTIVE if payment in current month or within 5-day grace period, otherwise STOPPED
+3. **Detect known subscriptions first** (from `known` config - matches even with 1 occurrence, includes current month)
+4. Filter remaining transactions to complete months only (incomplete current month excluded from pattern detection)
+5. Group by payee name (case-insensitive)
+6. Require 2+ occurrences, expenses only (negative amounts)
+7. Check monthly pattern: exactly 1 payment per calendar month (across ALL data)
+8. Check amount tolerance: configurable % between consecutive payments (default 35%)
+9. Determine status: ACTIVE if payment in current month or within 5-day grace period, otherwise STOPPED
 
 ## Key Dependencies
 
@@ -94,6 +114,7 @@ exclude:
 
 ## Notes
 
+- **Built-in known subscriptions**: Includes 70+ common services (Netflix, Spotify, Disney+, HBO Max, YouTube, GitHub, Adobe, etc.). Disable with `use_default_known: false` in config.
 - Handelsbanken truncates payee names to ~14-16 chars in their export
 - Source data uses Swedish column names: Reskontradatum, Transaktionsdatum, Text, Belopp, Saldo
 - Credit card exports have slightly different format (no Saldo column)

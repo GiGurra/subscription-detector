@@ -91,6 +91,14 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 			os.Exit(1)
 		}
 		info("Loaded config from %s\n", configPath)
+	} else {
+		// No config file - use default config with built-in known subscriptions
+		var err error
+		cfg, err = internal.NewDefaultConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating default config: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	// Apply grouping from config (combines transactions with different names into one)
@@ -105,9 +113,18 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 		fmt.Fprintf(os.Stderr, "Warning: Less than 3 complete months of data. Subscription detection may be unreliable.\n\n")
 	}
 
+	// Detect known subscriptions first (these can match even with 1 occurrence)
+	knownSubs, matchedTexts := internal.DetectKnownSubscriptions(transactions, dateRange, cfg)
+
+	// Filter out transactions that matched known subscriptions from regular detection
+	regularTxs := internal.FilterOutMatched(transactions, matchedTexts)
+
 	// Filter to only complete months for pattern detection
-	filtered := internal.FilterToCompleteMonths(transactions, completeMonths)
-	subscriptions := internal.DetectSubscriptions(filtered, transactions, dateRange, params.Tolerance)
+	filtered := internal.FilterToCompleteMonths(regularTxs, completeMonths)
+	subscriptions := internal.DetectSubscriptions(filtered, regularTxs, dateRange, params.Tolerance)
+
+	// Merge known and detected subscriptions
+	subscriptions = append(knownSubs, subscriptions...)
 
 	// Apply exclusion filters from config
 	subscriptions = internal.FilterByExclusions(subscriptions, cfg)

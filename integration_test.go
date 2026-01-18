@@ -257,15 +257,19 @@ func TestCLI_PriceRange(t *testing.T) {
 }
 
 func TestCLI_Tolerance(t *testing.T) {
+	// Disable default known subscriptions to test tolerance behavior
+	// (Spotify is in defaults and would bypass tolerance checks otherwise)
+	config := `use_default_known: false`
+
 	// With very strict tolerance, Spotify price change (119->129 = ~8%) should still pass
-	result := runCLIJSON(t, "--source", "simple-json", "testdata/sample.json", "--tolerance", "0.10")
+	result := runCLIWithConfigJSON(t, config, "--source", "simple-json", "testdata/sample.json", "--tolerance", "0.10")
 
 	if result.Summary.Count != 2 {
 		t.Errorf("expected 2 subscriptions with 10%% tolerance, got %d", result.Summary.Count)
 	}
 
 	// With extremely strict tolerance (1%), Spotify should be rejected
-	result = runCLIJSON(t, "--source", "simple-json", "testdata/sample.json", "--tolerance", "0.01")
+	result = runCLIWithConfigJSON(t, config, "--source", "simple-json", "testdata/sample.json", "--tolerance", "0.01")
 
 	if result.Summary.Count != 1 {
 		t.Errorf("expected 1 subscription with 1%% tolerance (Spotify rejected), got %d", result.Summary.Count)

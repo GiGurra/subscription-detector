@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"regexp"
 	"testing"
 	"time"
 )
@@ -381,5 +382,269 @@ func TestDetectSubscriptions_Stopped(t *testing.T) {
 	}
 	if spotify.LastDate.Format("2006-01-02") != "2025-02-15" {
 		t.Errorf("expected last date 2025-02-15, got %s", spotify.LastDate.Format("2006-01-02"))
+	}
+}
+
+func TestDetectKnownSubscriptions(t *testing.T) {
+	// Create transactions - some matching known patterns, some not
+	allTxs := []Transaction{
+		{Date: date("2025-01-15"), Text: "NewService ABC", Amount: -49},  // single occurrence in current month
+		{Date: date("2025-01-10"), Text: "Grocery Store", Amount: -150},  // should not match
+		{Date: date("2025-01-12"), Text: "OtherKnown XYZ", Amount: -29},  // matches another known
+	}
+
+	dateRange := DateRange{Start: date("2025-01-10"), End: date("2025-01-15")}
+
+	// Create config with known subscriptions
+	minAmt := 40.0
+	maxAmt := 60.0
+	cfg := &Config{
+		Known: []KnownSubscription{
+			{
+				Pattern:   "NewService",
+				MinAmount: &minAmt,
+				MaxAmount: &maxAmt,
+			},
+			{
+				Pattern: "OtherKnown",
+			},
+		},
+	}
+
+	// Compile the patterns (normally done in LoadConfig)
+	for i := range cfg.Known {
+		re, _ := compileKnownPattern(cfg.Known[i].Pattern)
+		cfg.Known[i].regex = re
+	}
+
+	subs, matchedTexts := DetectKnownSubscriptions(allTxs, dateRange, cfg)
+
+	// Should detect 2 known subscriptions
+	if len(subs) != 2 {
+		t.Fatalf("expected 2 known subscriptions, got %d", len(subs))
+	}
+
+	// Check matched texts
+	if !matchedTexts["newservice abc"] {
+		t.Error("expected 'newservice abc' to be in matched texts")
+	}
+	if !matchedTexts["otherknown xyz"] {
+		t.Error("expected 'otherknown xyz' to be in matched texts")
+	}
+	if matchedTexts["grocery store"] {
+		t.Error("'grocery store' should not be in matched texts")
+	}
+}
+
+func TestDetectKnownSubscriptions_AmountFilter(t *testing.T) {
+	allTxs := []Transaction{
+		{Date: date("2025-01-15"), Text: "Service", Amount: -49},  // within range
+		{Date: date("2025-01-16"), Text: "Service", Amount: -100}, // outside range
+	}
+
+	dateRange := DateRange{Start: date("2025-01-15"), End: date("2025-01-16")}
+
+	minAmt := 40.0
+	maxAmt := 60.0
+	cfg := &Config{
+		Known: []KnownSubscription{
+			{
+				Pattern:   "Service",
+				MinAmount: &minAmt,
+				MaxAmount: &maxAmt,
+			},
+		},
+	}
+
+	for i := range cfg.Known {
+		re, _ := compileKnownPattern(cfg.Known[i].Pattern)
+		cfg.Known[i].regex = re
+	}
+
+	subs, _ := DetectKnownSubscriptions(allTxs, dateRange, cfg)
+
+	if len(subs) != 1 {
+		t.Fatalf("expected 1 subscription, got %d", len(subs))
+	}
+
+	// Should only have 1 transaction (the one within amount range)
+	if len(subs[0].Transactions) != 1 {
+		t.Errorf("expected 1 transaction, got %d", len(subs[0].Transactions))
+	}
+}
+
+func TestDetectKnownSubscriptions_DateFilter(t *testing.T) {
+	allTxs := []Transaction{
+		{Date: date("2025-01-15"), Text: "Service", Amount: -49}, // before cutoff
+		{Date: date("2025-03-15"), Text: "Service", Amount: -49}, // after cutoff
+	}
+
+	dateRange := DateRange{Start: date("2025-01-15"), End: date("2025-03-15")}
+
+	cfg := &Config{
+		Known: []KnownSubscription{
+			{
+				Pattern: "Service",
+				Before:  "2025-02-01", // only match before Feb 1
+			},
+		},
+	}
+
+	for i := range cfg.Known {
+		re, _ := compileKnownPattern(cfg.Known[i].Pattern)
+		cfg.Known[i].regex = re
+		if cfg.Known[i].Before != "" {
+			cfg.Known[i].beforeDate, _ = time.Parse("2006-01-02", cfg.Known[i].Before)
+		}
+	}
+
+	subs, _ := DetectKnownSubscriptions(allTxs, dateRange, cfg)
+
+	if len(subs) != 1 {
+		t.Fatalf("expected 1 subscription, got %d", len(subs))
+	}
+
+	// Should only have 1 transaction (the one before the cutoff)
+	if len(subs[0].Transactions) != 1 {
+		t.Errorf("expected 1 transaction, got %d", len(subs[0].Transactions))
+	}
+}
+
+func TestFilterOutMatched(t *testing.T) {
+	txs := []Transaction{
+		{Text: "Netflix"},
+		{Text: "Spotify"},
+		{Text: "Grocery"},
+	}
+
+	matched := map[string]bool{
+		"netflix": true,
+		"spotify": true,
+	}
+
+	filtered := FilterOutMatched(txs, matched)
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 transaction, got %d", len(filtered))
+	}
+	if filtered[0].Text != "Grocery" {
+		t.Errorf("expected Grocery, got %s", filtered[0].Text)
+	}
+}
+
+func TestFilterOutMatched_Empty(t *testing.T) {
+	txs := []Transaction{
+		{Text: "Netflix"},
+		{Text: "Spotify"},
+	}
+
+	filtered := FilterOutMatched(txs, nil)
+
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 transactions when matched is nil, got %d", len(filtered))
+	}
+
+	filtered = FilterOutMatched(txs, map[string]bool{})
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 transactions when matched is empty, got %d", len(filtered))
+	}
+}
+
+// Helper to compile known pattern (same as in LoadConfig)
+func compileKnownPattern(pattern string) (*regexp.Regexp, error) {
+	return regexp.Compile("(?i)" + pattern)
+}
+
+func TestNewDefaultConfig(t *testing.T) {
+	cfg, err := NewDefaultConfig()
+	if err != nil {
+		t.Fatalf("NewDefaultConfig() failed: %v", err)
+	}
+
+	// Should have default known subscriptions compiled
+	if len(cfg.Known) == 0 {
+		t.Error("expected default known subscriptions")
+	}
+	if len(cfg.Known) != len(DefaultKnownSubscriptions) {
+		t.Errorf("expected %d default known subscriptions, got %d", len(DefaultKnownSubscriptions), len(cfg.Known))
+	}
+
+	// All patterns should be compiled
+	for i, k := range cfg.Known {
+		if k.regex == nil {
+			t.Errorf("expected pattern %d (%s) to be compiled", i, k.Pattern)
+		}
+	}
+}
+
+func TestDetectKnownSubscriptions_WithDefaults(t *testing.T) {
+	// Test that default known subscriptions work
+	allTxs := []Transaction{
+		{Date: date("2025-01-15"), Text: "NETFLIX Subscription", Amount: -149},
+		{Date: date("2025-01-16"), Text: "SPOTIFY Premium", Amount: -99},
+		{Date: date("2025-01-17"), Text: "Random Store", Amount: -50},
+	}
+
+	dateRange := DateRange{Start: date("2025-01-15"), End: date("2025-01-17")}
+
+	// Use default config (has all default known subscriptions)
+	cfg, err := NewDefaultConfig()
+	if err != nil {
+		t.Fatalf("NewDefaultConfig() failed: %v", err)
+	}
+
+	subs, matchedTexts := DetectKnownSubscriptions(allTxs, dateRange, cfg)
+
+	// Should detect Netflix and Spotify as known subscriptions
+	if len(subs) != 2 {
+		t.Errorf("expected 2 known subscriptions (Netflix, Spotify), got %d", len(subs))
+	}
+
+	// Check that they were matched
+	if !matchedTexts["netflix subscription"] {
+		t.Error("expected Netflix to be matched")
+	}
+	if !matchedTexts["spotify premium"] {
+		t.Error("expected Spotify to be matched")
+	}
+	if matchedTexts["random store"] {
+		t.Error("Random Store should not be matched")
+	}
+}
+
+func TestDefaultKnownSubscriptions_Patterns(t *testing.T) {
+	// Verify some key patterns work correctly
+	tests := []struct {
+		text    string
+		matches bool
+	}{
+		{"NETFLIX.COM", true},
+		{"Netflix subscription", true},
+		{"SPOTIFY Premium", true},
+		{"Spotify", true},
+		{"DISNEY+ Monthly", true},
+		{"HBO MAX", true},
+		{"HBOMAX", true},
+		{"Amazon Prime Video", true},
+		{"APPLE TV+", true},
+		{"GitHub Pro", true},
+		{"Random Company", false},
+		{"My Grocery Store", false},
+	}
+
+	cfg, err := NewDefaultConfig()
+	if err != nil {
+		t.Fatalf("NewDefaultConfig() failed: %v", err)
+	}
+
+	for _, tt := range tests {
+		tx := Transaction{Text: tt.text, Amount: -50}
+		matched := cfg.MatchesKnown(tx)
+		if tt.matches && matched == nil {
+			t.Errorf("expected %q to match a default known subscription", tt.text)
+		}
+		if !tt.matches && matched != nil {
+			t.Errorf("expected %q NOT to match any default known subscription, but matched %s", tt.text, matched.Pattern)
+		}
 	}
 }
