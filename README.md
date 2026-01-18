@@ -2,6 +2,10 @@
 
 A CLI tool that analyzes bank transaction exports to detect recurring monthly subscriptions. It identifies active and stopped subscriptions, calculates monthly/yearly costs, and helps you understand your recurring expenses.
 
+> **📚 Full documentation:** [gigurra.github.io/subscription-detector](https://gigurra.github.io/subscription-detector/)
+>
+> This README is a quick-start summary. See the docs for detailed configuration, the detection algorithm, and how to add custom parsers.
+
 ```
 ╭──────────────────┬──────────────────┬──────────────────────────┬─────────┬─────┬────────────┬────────────┬─────────╮
 │ Name             │ Description      │ Tags                     │ Status  │ Day │ Last Seen  │ Monthly    │ Yearly  │
