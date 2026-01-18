@@ -1,0 +1,36 @@
+{
+  "transactions": [
+    {"date": "2025-01-05", "text": "NETFLIX.COM", "amount": -199.00},
+    {"date": "2025-02-05", "text": "NETFLIX.COM", "amount": -199.00},
+    {"date": "2025-03-05", "text": "NETFLIX.COM", "amount": -199.00},
+    {"date": "2025-04-05", "text": "NETFLIX.COM", "amount": -199.00},
+    {"date": "2025-05-05", "text": "NETFLIX.COM", "amount": -199.00},
+    {"date": "2025-06-05", "text": "NETFLIX.COM", "amount": -199.00},
+
+    {"date": "2025-01-12", "text": "Spotify P3A8AC", "amount": -169.00},
+    {"date": "2025-02-12", "text": "Spotify P3B5D9", "amount": -169.00},
+    {"date": "2025-03-12", "text": "Spotify P3C102", "amount": -169.00},
+    {"date": "2025-04-12", "text": "Spotify P3D49A", "amount": -179.00},
+    {"date": "2025-05-12", "text": "Spotify P3E460", "amount": -179.00},
+    {"date": "2025-06-12", "text": "Spotify P3F521", "amount": -179.00},
+
+    {"date": "2025-01-02", "text": "GOOGLE*GSUITE abc123", "amount": -72.00},
+    {"date": "2025-02-02", "text": "Google GSUITE_def456", "amount": -72.00},
+    {"date": "2025-03-02", "text": "Google Workspace", "amount": -76.00},
+    {"date": "2025-04-02", "text": "Google Workspace", "amount": -76.00},
+    {"date": "2025-05-02", "text": "Google Workspace", "amount": -76.00},
+    {"date": "2025-06-02", "text": "Google Workspace", "amount": -76.00},
+
+    {"date": "2025-01-20", "text": "GYM MEMBERSHIP", "amount": -399.00},
+    {"date": "2025-02-20", "text": "GYM MEMBERSHIP", "amount": -399.00},
+    {"date": "2025-03-20", "text": "GYM MEMBERSHIP", "amount": -399.00},
+
+    {"date": "2025-01-15", "text": "McDonald's", "amount": -89.00},
+    {"date": "2025-02-22", "text": "McDonald's", "amount": -112.00},
+    {"date": "2025-03-08", "text": "McDonald's", "amount": -95.00},
+    {"date": "2025-04-28", "text": "McDonald's", "amount": -78.00},
+
+    {"date": "2025-02-14", "text": "Flowers Shop", "amount": -450.00},
+    {"date": "2025-05-10", "text": "Birthday Gift", "amount": -299.00}
+  ]
+}

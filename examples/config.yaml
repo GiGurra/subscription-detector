@@ -1,0 +1,37 @@
+# Example configuration for subscription-detector
+# Copy to ~/.subscription-detector/config.yaml or use with --config flag
+
+# Custom descriptions for subscriptions
+descriptions:
+  NETFLIX.COM: "Netflix"
+  GYM MEMBERSHIP: "Fitness Center"
+  Google Workspace: "Google Workspace"
+
+# Tags for categorizing subscriptions
+tags:
+  NETFLIX.COM: [entertainment, streaming]
+  Spotify: [entertainment, music]
+  Google Workspace: [work, productivity]
+  GYM MEMBERSHIP: [health]
+
+# Group transactions with varying names into one subscription
+groups:
+  - name: "Spotify"
+    patterns:
+      - "^Spotify"  # Matches "Spotify P3A8AC", "Spotify P3B5D9", etc.
+  - name: "Google Workspace"
+    patterns:
+      - "GOOGLE\\*GSUITE"
+      - "Google GSUITE_"
+      - "Google Workspace"
+
+# Exclude transactions from detection
+exclude:
+  # Regular places (not subscriptions)
+  - "McDonald's"
+  - "Flowers Shop"
+  - "Birthday Gift"
+
+  # Time-based exclusion example:
+  # - pattern: "Old Service"
+  #   before: "2025-06-01"  # Only exclude before this date
