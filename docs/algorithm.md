@@ -44,7 +44,16 @@ All matching transactions are renamed to "Google Workspace" before detection.
 
 ### 3. Detect Known Subscriptions
 
-The tool has 70+ built-in patterns for common services. These are matched **immediately**, even with just 1 occurrence:
+The tool has 70+ built-in patterns for common services. These are matched **immediately** and **bypass the normal detection rules**:
+
+| Rule | Pattern Detection | Known Subscriptions |
+|------|-------------------|---------------------|
+| Minimum occurrences | 2+ required | **1 is enough** |
+| Complete months only | Yes | **No - includes current month** |
+| Tolerance check | Yes | No |
+| Monthly pattern check | Yes | No |
+
+**Built-in patterns include:**
 
 - Video: Netflix, Disney+, HBO Max, Amazon Prime, etc.
 - Music: Spotify, Apple Music, Tidal, YouTube Music, etc.
@@ -52,11 +61,7 @@ The tool has 70+ built-in patterns for common services. These are matched **imme
 - Productivity: Adobe, Microsoft 365, Dropbox, etc.
 - And many more...
 
-**Benefits:**
-
-- Works in the current (incomplete) month
-- No need for historical data
-- Catches new subscriptions immediately
+This means if you just subscribed to Netflix today, it will be detected immediately - no need to wait for 2+ months of history.
 
 You can add your own patterns or disable defaults:
 
@@ -74,7 +79,15 @@ The tool determines which months have complete data:
 - **Complete month**: A past month, or current month if today is the last day
 - **Incomplete month**: The current month (still accumulating transactions)
 
-Incomplete months are excluded from pattern detection (but included for known subscriptions).
+**Why exclude incomplete months from pattern detection?**
+
+If today is January 15th and your subscription usually charges on the 20th, the algorithm shouldn't conclude "no payment this month" - the payment just hasn't happened yet. By excluding the current month, we avoid false negatives.
+
+However, incomplete months **are** included when:
+
+- Checking for known subscriptions (they match immediately)
+- Determining if a subscription is ACTIVE (payment in current month = active)
+- Calculating the latest payment amount
 
 ### 5. Pattern Detection
 
