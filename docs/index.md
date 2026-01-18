@@ -18,13 +18,13 @@ A CLI tool to detect recurring monthly subscriptions from bank transaction expor
 ./subscription-detector handelsbanken-xlsx:transactions.xlsx
 
 # Output
-┌──────────────────┬─────────────┬────────────┬────────┐
-│ NAME             │ DESCRIPTION │ AMOUNT/MO  │ STATUS │
-├──────────────────┼─────────────┼────────────┼────────┤
-│ Netflix          │             │  99.00 kr  │ ACTIVE │
-│ Spotify          │             │ 129.00 kr  │ ACTIVE │
-│ Google Workspace │             │ 115.00 kr  │ ACTIVE │
-└──────────────────┴─────────────┴────────────┴────────┘
++------------------+-------------+------------+--------+
+| NAME             | DESCRIPTION | AMOUNT/MO  | STATUS |
++------------------+-------------+------------+--------+
+| Netflix          |             |  99.00 kr  | ACTIVE |
+| Spotify          |             | 129.00 kr  | ACTIVE |
+| Google Workspace |             | 115.00 kr  | ACTIVE |
++------------------+-------------+------------+--------+
 ```
 
 ## How It Works
