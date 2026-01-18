@@ -127,3 +127,44 @@ subscription-detector --source simple-json examples/transactions.json --suggest-
 ```bash
 subscription-detector --source simple-json examples/transactions.json --config examples/config.yaml --sort amount --sort-dir desc
 ```
+
+### Currency options
+
+```bash
+# Auto-detect from system locale (default)
+subscription-detector simple-json:examples/transactions.json
+
+# Override with specific currency
+subscription-detector --currency USD simple-json:examples/transactions.json
+subscription-detector --currency EUR simple-json:examples/transactions.json
+subscription-detector --currency BRL simple-json:examples/transactions.json
+```
+
+## Testing on Windows
+
+On Windows, clone the repo and build:
+
+```powershell
+git clone https://github.com/GiGurra/subscription-detector
+cd subscription-detector
+go build .
+```
+
+Run with examples:
+
+```powershell
+# Auto-detects currency from Windows locale settings
+.\subscription-detector.exe simple-json:examples/transactions.json
+
+# Override currency
+.\subscription-detector.exe --currency USD simple-json:examples/transactions.json
+
+# With config
+.\subscription-detector.exe --config examples/config.yaml simple-json:examples/transactions.json
+```
+
+The tool automatically detects your Windows locale via `GetUserDefaultLocaleName` API and sets the appropriate currency. For example:
+- US English locale → USD ($1,234)
+- Swedish locale → SEK (1 234 kr)
+- German locale → EUR (1.234 €)
+- Brazilian Portuguese locale → BRL (1.234 R$)
