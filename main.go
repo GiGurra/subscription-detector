@@ -15,7 +15,7 @@ import (
 )
 
 type Params struct {
-	Source        string   `descr:"Data source type" alts:"handelsbanken-xlsx,testdata-json" strict:"true"`
+	Source        string   `descr:"Data source type" alts:"handelsbanken-xlsx,simple-json" strict:"true"`
 	Files         []string `descr:"Path(s) to transaction file(s)" positional:"true"`
 	Config        string   `descr:"Path to config file (YAML)" optional:"true"`
 	InitConfig    string   `descr:"Generate config template and save to path" optional:"true"`

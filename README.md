@@ -195,11 +195,11 @@ exclude:
 | Source | Description |
 |--------|-------------|
 | `handelsbanken-xlsx` | Handelsbanken (Sweden) XLSX export. Supports both regular accounts and credit cards. |
-| `testdata-json` | Simple JSON format for testing and development. |
+| `simple-json` | Simple JSON format, easy to convert to from any source. |
 
-### JSON Test Format
+### Simple JSON Format
 
-The `testdata-json` format is useful for testing or importing from custom sources:
+The `simple-json` format is useful for importing from custom sources or converted data:
 
 ```json
 {
@@ -212,7 +212,7 @@ The `testdata-json` format is useful for testing or importing from custom source
 
 Usage:
 ```bash
-./subscription-detector --source testdata-json transactions.json
+./subscription-detector --source simple-json transactions.json
 ```
 
 ## Output Example

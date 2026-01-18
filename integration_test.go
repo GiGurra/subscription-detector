@@ -84,7 +84,7 @@ func runCLIWithConfigJSON(t *testing.T, configContent string, args ...string) JS
 }
 
 func TestCLI_BasicDetection(t *testing.T) {
-	result := runCLIJSON(t, "--source", "testdata-json", "testdata/sample.json")
+	result := runCLIJSON(t, "--source", "simple-json", "testdata/sample.json")
 
 	if result.Summary.Count != 2 {
 		t.Errorf("expected 2 subscriptions, got %d", result.Summary.Count)
@@ -107,7 +107,7 @@ func TestCLI_BasicDetection(t *testing.T) {
 }
 
 func TestCLI_Summary(t *testing.T) {
-	result := runCLIJSON(t, "--source", "testdata-json", "testdata/sample.json")
+	result := runCLIJSON(t, "--source", "simple-json", "testdata/sample.json")
 
 	// Netflix: 99, Spotify: 129 (latest)
 	expectedMonthly := 99.0 + 129.0
@@ -120,7 +120,7 @@ func TestCLI_Summary(t *testing.T) {
 }
 
 func TestCLI_ShowAll(t *testing.T) {
-	output := runCLI(t, "--source", "testdata-json", "testdata/sample.json", "--show", "all")
+	output := runCLI(t, "--source", "simple-json", "testdata/sample.json", "--show", "all")
 
 	if !strings.Contains(output, "Showing: all") {
 		t.Errorf("expected 'Showing: all', got: %s", output)
@@ -133,7 +133,7 @@ tags:
   Netflix: [entertainment]
   Spotify: [entertainment, music]
 `
-	result := runCLIWithConfigJSON(t, config, "--source", "testdata-json", "testdata/sample.json")
+	result := runCLIWithConfigJSON(t, config, "--source", "simple-json", "testdata/sample.json")
 
 	for _, sub := range result.Subscriptions {
 		if sub.Name == "Netflix" && len(sub.Tags) == 0 {
@@ -152,7 +152,7 @@ tags:
   Spotify: [music]
 `
 	result := runCLIWithConfigJSON(t, config,
-		"--source", "testdata-json", "testdata/sample.json",
+		"--source", "simple-json", "testdata/sample.json",
 		"--tags", "entertainment")
 
 	if result.Summary.Count != 1 {
@@ -168,7 +168,7 @@ func TestCLI_Descriptions(t *testing.T) {
 descriptions:
   Netflix: "Video Streaming"
 `
-	result := runCLIWithConfigJSON(t, config, "--source", "testdata-json", "testdata/sample.json")
+	result := runCLIWithConfigJSON(t, config, "--source", "simple-json", "testdata/sample.json")
 
 	for _, sub := range result.Subscriptions {
 		if sub.Name == "Netflix" && sub.Description != "Video Streaming" {
@@ -182,7 +182,7 @@ func TestCLI_Exclusions(t *testing.T) {
 exclude:
   - Netflix
 `
-	result := runCLIWithConfigJSON(t, config, "--source", "testdata-json", "testdata/sample.json")
+	result := runCLIWithConfigJSON(t, config, "--source", "simple-json", "testdata/sample.json")
 
 	if result.Summary.Count != 1 {
 		t.Errorf("expected 1 subscription after exclusion, got %d", result.Summary.Count)
@@ -216,7 +216,7 @@ groups:
     patterns:
       - "^SPOTIFY"
 `
-	result := runCLIWithConfigJSON(t, config, "--source", "testdata-json", dataPath)
+	result := runCLIWithConfigJSON(t, config, "--source", "simple-json", dataPath)
 
 	if result.Summary.Count != 1 {
 		t.Errorf("expected 1 grouped subscription, got %d", result.Summary.Count)
@@ -227,7 +227,7 @@ groups:
 }
 
 func TestCLI_SortByAmount(t *testing.T) {
-	result := runCLIJSON(t, "--source", "testdata-json", "testdata/sample.json",
+	result := runCLIJSON(t, "--source", "simple-json", "testdata/sample.json",
 		"--sort", "amount", "--sort-dir", "desc")
 
 	if len(result.Subscriptions) < 2 {
@@ -241,7 +241,7 @@ func TestCLI_SortByAmount(t *testing.T) {
 }
 
 func TestCLI_PriceRange(t *testing.T) {
-	result := runCLIJSON(t, "--source", "testdata-json", "testdata/sample.json")
+	result := runCLIJSON(t, "--source", "simple-json", "testdata/sample.json")
 
 	for _, sub := range result.Subscriptions {
 		if sub.Name == "Spotify" {
@@ -254,14 +254,14 @@ func TestCLI_PriceRange(t *testing.T) {
 
 func TestCLI_Tolerance(t *testing.T) {
 	// With very strict tolerance, Spotify price change (119->129 = ~8%) should still pass
-	result := runCLIJSON(t, "--source", "testdata-json", "testdata/sample.json", "--tolerance", "0.10")
+	result := runCLIJSON(t, "--source", "simple-json", "testdata/sample.json", "--tolerance", "0.10")
 
 	if result.Summary.Count != 2 {
 		t.Errorf("expected 2 subscriptions with 10%% tolerance, got %d", result.Summary.Count)
 	}
 
 	// With extremely strict tolerance (1%), Spotify should be rejected
-	result = runCLIJSON(t, "--source", "testdata-json", "testdata/sample.json", "--tolerance", "0.01")
+	result = runCLIJSON(t, "--source", "simple-json", "testdata/sample.json", "--tolerance", "0.01")
 
 	if result.Summary.Count != 1 {
 		t.Errorf("expected 1 subscription with 1%% tolerance (Spotify rejected), got %d", result.Summary.Count)
@@ -287,7 +287,7 @@ func TestCLI_MultipleFiles(t *testing.T) {
 	os.WriteFile(path1, []byte(data1), 0644)
 	os.WriteFile(path2, []byte(data2), 0644)
 
-	result := runCLIJSON(t, "--source", "testdata-json", path1, path2)
+	result := runCLIJSON(t, "--source", "simple-json", path1, path2)
 
 	if result.Summary.Count != 1 {
 		t.Errorf("expected 1 subscription from combined files, got %d", result.Summary.Count)
@@ -305,7 +305,7 @@ func TestCLI_EmptyResult(t *testing.T) {
 	dataPath := filepath.Join(tmpDir, "data.json")
 	os.WriteFile(dataPath, []byte(testData), 0644)
 
-	result := runCLIJSON(t, "--source", "testdata-json", dataPath)
+	result := runCLIJSON(t, "--source", "simple-json", dataPath)
 
 	if result.Summary.Count != 0 {
 		t.Errorf("expected 0 subscriptions, got %d", result.Summary.Count)
