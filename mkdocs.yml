@@ -40,4 +40,5 @@ nav:
   - Installation: installation.md
   - Usage: usage.md
   - Configuration: configuration.md
+  - Detection Algorithm: algorithm.md
   - Adding Parsers: parsers.md
