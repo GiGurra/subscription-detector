@@ -3,10 +3,18 @@ package internal
 import (
 	"os"
 	"testing"
+
+	"golang.org/x/text/language"
 )
 
+// resetDetectedLocale resets the global detectedLocale for testing
+func resetDetectedLocale() {
+	detectedLocale = language.Und
+}
+
 func TestGetCurrency_KnownCurrencies(t *testing.T) {
-	codes := []string{"SEK", "USD", "EUR", "GBP", "NOK", "DKK", "CHF", "JPY", "CAD", "AUD"}
+	resetDetectedLocale()
+	codes := []string{"SEK", "USD", "EUR", "GBP", "NOK", "DKK", "CHF", "JPY", "CAD", "AUD", "BRL"}
 
 	for _, code := range codes {
 		t.Run(code, func(t *testing.T) {
@@ -22,6 +30,7 @@ func TestGetCurrency_KnownCurrencies(t *testing.T) {
 }
 
 func TestGetCurrency_CaseInsensitive(t *testing.T) {
+	resetDetectedLocale()
 	tests := []string{"sek", "Sek", "SEK", "seK"}
 	for _, code := range tests {
 		c := GetCurrency(code)
@@ -32,6 +41,7 @@ func TestGetCurrency_CaseInsensitive(t *testing.T) {
 }
 
 func TestGetCurrency_Unknown(t *testing.T) {
+	resetDetectedLocale()
 	c := GetCurrency("XYZ")
 	if c.Code != "XYZ" {
 		t.Errorf("Code = %q, want XYZ", c.Code)
@@ -44,6 +54,7 @@ func TestGetCurrency_Unknown(t *testing.T) {
 }
 
 func TestCurrency_Format(t *testing.T) {
+	resetDetectedLocale()
 	// Note: x/text uses non-breaking space (U+00A0) for Swedish/Norwegian thousand separators
 	// and fullwidth yen (￥) for Japanese
 	nbsp := "\u00a0" // non-breaking space
@@ -69,6 +80,8 @@ func TestCurrency_Format(t *testing.T) {
 		{"CHF thousands", "CHF", 1234, "1.234 CHF"},
 		{"JPY thousands", "JPY", 1000, "￥1,000"},
 		{"JPY large", "JPY", 123456, "￥123,456"},
+		{"BRL small", "BRL", 100, "100 R$"},
+		{"BRL thousands", "BRL", 1234, "1.234 R$"},
 		{"Unknown small", "XYZ", 100, "100 XYZ"},
 		{"Unknown thousands", "XYZ", 1234, "1,234 XYZ"},
 	}
@@ -85,6 +98,7 @@ func TestCurrency_Format(t *testing.T) {
 }
 
 func TestCurrency_FormatRange(t *testing.T) {
+	resetDetectedLocale()
 	nbsp := "\u00a0" // non-breaking space
 
 	tests := []struct {
@@ -100,6 +114,8 @@ func TestCurrency_FormatRange(t *testing.T) {
 		{"USD thousands range", "USD", 1000, 1500, "$1,000-$1,500"},
 		{"EUR small range", "EUR", 50, 75, "50-75 €"},
 		{"EUR thousands range", "EUR", 1000, 2000, "1.000-2.000 €"},
+		{"BRL small range", "BRL", 100, 200, "100-200 R$"},
+		{"BRL thousands range", "BRL", 1000, 2000, "1.000-2.000 R$"},
 		{"Unknown small range", "XYZ", 10, 20, "10-20 XYZ"},
 		{"Unknown thousands range", "XYZ", 1000, 2000, "1,000-2,000 XYZ"},
 	}
@@ -115,27 +131,31 @@ func TestCurrency_FormatRange(t *testing.T) {
 	}
 }
 
-func TestParseCountryFromLocale(t *testing.T) {
+func TestParseCurrencyFromLocale(t *testing.T) {
 	tests := []struct {
-		locale string
-		want   string
+		locale       string
+		wantCurrency string
+		wantTag      string
 	}{
-		{"sv_SE.UTF-8", "SE"},
-		{"en_US.UTF-8", "US"},
-		{"de_DE", "DE"},
-		{"fr_FR.ISO-8859-1", "FR"},
-		{"en_GB.UTF-8@euro", "GB"},
-		{"C", ""},
-		{"POSIX", ""},
-		{"en", ""},
-		{"", ""},
+		{"sv_SE.UTF-8", "SEK", "sv-SE"},
+		{"en_US.UTF-8", "USD", "en-US"},
+		{"pt_BR.UTF-8", "BRL", "pt-BR"},
+		{"de_DE", "EUR", "de-DE"},
+		{"ja_JP.UTF-8", "JPY", "ja-JP"},
+		{"en_GB.UTF-8", "GBP", "en-GB"},
+		{"C", "", ""},
+		{"en", "", ""},  // No region
+		{"", "", ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.locale, func(t *testing.T) {
-			got := parseCountryFromLocale(tt.locale)
-			if got != tt.want {
-				t.Errorf("parseCountryFromLocale(%q) = %q, want %q", tt.locale, got, tt.want)
+			gotCurrency, gotTag := parseCurrencyFromLocale(tt.locale)
+			if gotCurrency != tt.wantCurrency {
+				t.Errorf("parseCurrencyFromLocale(%q) currency = %q, want %q", tt.locale, gotCurrency, tt.wantCurrency)
+			}
+			if tt.wantTag != "" && gotTag.String() != tt.wantTag {
+				t.Errorf("parseCurrencyFromLocale(%q) tag = %q, want %q", tt.locale, gotTag.String(), tt.wantTag)
 			}
 		})
 	}
@@ -152,6 +172,7 @@ func TestDetectSystemCurrency(t *testing.T) {
 		os.Setenv("LC_MONETARY", origMonetary)
 		os.Setenv("LC_ALL", origAll)
 		os.Setenv("LANG", origLang)
+		resetDetectedLocale()
 	}()
 
 	tests := []struct {
@@ -197,6 +218,20 @@ func TestDetectSystemCurrency(t *testing.T) {
 			wantCurrency: "GBP",
 		},
 		{
+			name:         "Brazilian real",
+			lcMonetary:   "pt_BR.UTF-8",
+			lcAll:        "",
+			lang:         "",
+			wantCurrency: "BRL",
+		},
+		{
+			name:         "Japanese yen",
+			lcMonetary:   "ja_JP.UTF-8",
+			lcAll:        "",
+			lang:         "",
+			wantCurrency: "JPY",
+		},
+		{
 			name:         "No detection when all empty",
 			lcMonetary:   "",
 			lcAll:        "",
@@ -214,6 +249,7 @@ func TestDetectSystemCurrency(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			resetDetectedLocale()
 			os.Setenv("LC_MONETARY", tt.lcMonetary)
 			os.Setenv("LC_ALL", tt.lcAll)
 			os.Setenv("LANG", tt.lang)
@@ -223,5 +259,38 @@ func TestDetectSystemCurrency(t *testing.T) {
 				t.Errorf("DetectSystemCurrency() = %q, want %q", got, tt.wantCurrency)
 			}
 		})
+	}
+}
+
+func TestDetectSystemCurrency_SetsLocaleForFormatting(t *testing.T) {
+	// Save original env vars
+	origMonetary := os.Getenv("LC_MONETARY")
+	origAll := os.Getenv("LC_ALL")
+	origLang := os.Getenv("LANG")
+
+	defer func() {
+		os.Setenv("LC_MONETARY", origMonetary)
+		os.Setenv("LC_ALL", origAll)
+		os.Setenv("LANG", origLang)
+		resetDetectedLocale()
+	}()
+
+	// Set Brazilian locale
+	resetDetectedLocale()
+	os.Setenv("LC_MONETARY", "pt_BR.UTF-8")
+	os.Setenv("LC_ALL", "")
+	os.Setenv("LANG", "")
+
+	currCode := DetectSystemCurrency()
+	if currCode != "BRL" {
+		t.Fatalf("DetectSystemCurrency() = %q, want BRL", currCode)
+	}
+
+	// Now GetCurrency should use Brazilian formatting
+	c := GetCurrency("BRL")
+	formatted := c.Format(1234)
+	// Brazilian Portuguese uses period as thousand separator
+	if formatted != "1.234 R$" {
+		t.Errorf("Format(1234) = %q, want %q", formatted, "1.234 R$")
 	}
 }

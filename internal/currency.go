@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"os"
 	"strings"
 
 	"golang.org/x/text/currency"
@@ -18,46 +17,46 @@ type Currency struct {
 	printer *message.Printer
 }
 
-// currencyToLocale maps currency codes to their "home" locale for formatting
-var currencyToLocale = map[string]language.Tag{
-	"SEK": language.Swedish,
-	"USD": language.AmericanEnglish,
-	"EUR": language.German, // Uses space as thousand separator
-	"GBP": language.BritishEnglish,
-	"NOK": language.Norwegian,
-	"DKK": language.Danish,
-	"CHF": language.German,
-	"JPY": language.Japanese,
-	"CAD": language.CanadianFrench, // Uses space as thousand separator
-	"AUD": language.MustParse("en-AU"),
-}
-
-// Country to currency code mapping for locale detection
-var countryToCurrency = map[string]string{
-	"SE": "SEK", // Sweden
-	"US": "USD", // United States
-	"DE": "EUR", // Germany
-	"FR": "EUR", // France
-	"IT": "EUR", // Italy
-	"ES": "EUR", // Spain
-	"NL": "EUR", // Netherlands
-	"AT": "EUR", // Austria
-	"FI": "EUR", // Finland
-	"GB": "GBP", // United Kingdom
-	"NO": "NOK", // Norway
-	"DK": "DKK", // Denmark
-	"CH": "CHF", // Switzerland
-	"JP": "JPY", // Japan
-	"CA": "CAD", // Canada
-	"AU": "AUD", // Australia
-}
-
 // symbolOverrides provides custom symbols where x/text defaults aren't ideal
 var symbolOverrides = map[string]string{
 	"SEK": "kr",
 	"NOK": "kr",
 	"DKK": "kr",
+	"ISK": "kr",
 }
+
+// defaultLocaleForCurrency provides fallback locales when currency is specified
+// without a system locale (e.g., --currency USD). Uses a "home" locale for each currency.
+var defaultLocaleForCurrency = map[string]language.Tag{
+	"SEK": language.Swedish,
+	"USD": language.AmericanEnglish,
+	"EUR": language.German,
+	"GBP": language.BritishEnglish,
+	"NOK": language.Norwegian,
+	"DKK": language.Danish,
+	"CHF": language.German,
+	"JPY": language.Japanese,
+	"CAD": language.CanadianFrench,
+	"AUD": language.MustParse("en-AU"),
+	"BRL": language.BrazilianPortuguese,
+	"MXN": language.LatinAmericanSpanish,
+	"INR": language.MustParse("en-IN"),
+	"CNY": language.Chinese,
+	"KRW": language.Korean,
+	"PLN": language.Polish,
+	"CZK": language.Czech,
+	"HUF": language.Hungarian,
+	"RUB": language.Russian,
+	"TRY": language.Turkish,
+	"ZAR": language.MustParse("en-ZA"),
+	"NZD": language.MustParse("en-NZ"),
+	"SGD": language.MustParse("en-SG"),
+	"HKD": language.MustParse("zh-HK"),
+	"THB": language.Thai,
+}
+
+// detectedLocale stores the system locale when auto-detected, so we can use it for formatting
+var detectedLocale language.Tag
 
 // GetCurrency returns the Currency for a given code.
 func GetCurrency(code string) Currency {
@@ -70,10 +69,15 @@ func GetCurrency(code string) Currency {
 		unit = currency.USD // fallback unit for number formatting only
 	}
 
-	// Get the locale for this currency
-	tag, ok := currencyToLocale[code]
-	if !ok {
-		tag = language.English // default to English formatting
+	// Determine the locale for formatting
+	// Priority: detected system locale > default locale for currency > English
+	var tag language.Tag
+	if detectedLocale != language.Und {
+		tag = detectedLocale
+	} else if t, ok := defaultLocaleForCurrency[code]; ok {
+		tag = t
+	} else {
+		tag = language.English
 	}
 
 	c := Currency{
@@ -91,52 +95,84 @@ func GetCurrency(code string) Currency {
 	return c
 }
 
-// DetectSystemCurrency attempts to detect the system currency from locale environment variables.
-// Checks LC_MONETARY, LC_ALL, and LANG in that order.
-// Returns empty string if detection fails.
-func DetectSystemCurrency() string {
-	// Check environment variables in priority order
-	for _, envVar := range []string{"LC_MONETARY", "LC_ALL", "LANG"} {
-		locale := os.Getenv(envVar)
-		if locale == "" || locale == "C" || locale == "POSIX" {
-			continue
-		}
+// GetCurrencyWithLocale returns a Currency with a specific locale for formatting.
+func GetCurrencyWithLocale(code string, tag language.Tag) Currency {
+	code = strings.ToUpper(code)
 
-		// Parse locale format: language_COUNTRY.encoding or language_COUNTRY
-		// Examples: sv_SE.UTF-8, en_US.UTF-8, de_DE
-		country := parseCountryFromLocale(locale)
-		if country != "" {
-			if curr, ok := countryToCurrency[country]; ok {
-				return curr
-			}
-		}
+	unit, err := currency.ParseISO(code)
+	isUnknown := err != nil
+	if isUnknown {
+		unit = currency.USD
+	}
+
+	c := Currency{
+		Code:    code,
+		unit:    unit,
+		tag:     tag,
+		printer: message.NewPrinter(tag),
+	}
+
+	if isUnknown {
+		symbolOverrides[code] = code
+	}
+
+	return c
+}
+
+// DetectSystemCurrency attempts to detect the system currency from the OS locale.
+// On Linux/Unix: checks LANGUAGE, LC_ALL, LC_MONETARY, LC_MESSAGES, LANG env vars
+// On macOS: checks env vars first, then falls back to AppleLocale system preference
+// On Windows: uses GetUserDefaultLocaleName API
+// Returns empty string if detection fails.
+// Also sets detectedLocale for use in formatting.
+func DetectSystemCurrency() string {
+	locale := detectSystemLocale()
+	if locale == "" {
+		return ""
+	}
+
+	// Try to get currency and locale from the locale string
+	currCode, tag := parseCurrencyFromLocale(locale)
+	if currCode != "" {
+		detectedLocale = tag
+		return currCode
 	}
 	return ""
 }
 
-// parseCountryFromLocale extracts the country code from a locale string.
-// Examples: "sv_SE.UTF-8" -> "SE", "en_US" -> "US"
-func parseCountryFromLocale(locale string) string {
+// parseCurrencyFromLocale extracts currency code and language tag from a locale string.
+// Examples: "sv_SE.UTF-8" -> ("SEK", sv-SE), "pt_BR.UTF-8" -> ("BRL", pt-BR)
+func parseCurrencyFromLocale(locale string) (string, language.Tag) {
 	// Remove encoding suffix (everything after .)
-	if idx := strings.Index(locale, "."); idx != -1 {
-		locale = locale[:idx]
+	base := locale
+	if idx := strings.Index(base, "."); idx != -1 {
+		base = base[:idx]
 	}
 
 	// Remove modifier suffix (everything after @)
-	if idx := strings.Index(locale, "@"); idx != -1 {
-		locale = locale[:idx]
+	if idx := strings.Index(base, "@"); idx != -1 {
+		base = base[:idx]
 	}
 
-	// Find underscore separating language and country
-	if idx := strings.Index(locale, "_"); idx != -1 && idx+1 < len(locale) {
-		country := locale[idx+1:]
-		// Country codes are 2 uppercase letters
-		if len(country) >= 2 {
-			return strings.ToUpper(country[:2])
-		}
+	// Convert to BCP 47 format: "sv_SE" -> "sv-SE"
+	tagStr := strings.Replace(base, "_", "-", 1)
+	tag, err := language.Parse(tagStr)
+	if err != nil {
+		return "", language.Und
 	}
 
-	return ""
+	// Extract region and get currency for that region
+	_, _, region := tag.Raw()
+	if region.String() == "" || region.String() == "ZZ" {
+		return "", language.Und
+	}
+
+	unit, ok := currency.FromRegion(region)
+	if !ok {
+		return "", language.Und
+	}
+
+	return unit.String(), tag
 }
 
 // getSymbol returns the currency symbol, using overrides where needed
@@ -151,7 +187,7 @@ func (c Currency) getSymbol() string {
 // isPrefix returns true if this currency symbol should be placed before the amount
 func (c Currency) isPrefix() bool {
 	switch c.Code {
-	case "USD", "GBP", "JPY", "CAD", "AUD":
+	case "USD", "GBP", "JPY", "CAD", "AUD", "MXN", "HKD", "SGD", "NZD", "ZAR":
 		return true
 	default:
 		return false
