@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -21,6 +22,7 @@ type Params struct {
 	Show          string   `descr:"Which subscriptions to show" default:"active" alts:"active,stopped,all" strict:"true"`
 	Sort          string   `descr:"Sort field for output" default:"name" alts:"name,description,amount" strict:"true"`
 	SortDir       string   `descr:"Sort direction" default:"asc" alts:"asc,desc" strict:"true"`
+	Output        string   `descr:"Output format" default:"table" alts:"table,json" strict:"true"`
 	Tolerance     float64  `descr:"Max price change between months (0.35 = 35%)" default:"0.35"`
 	SuggestGroups bool     `descr:"Analyze and suggest potential transaction groups" optional:"true"`
 	Tags          []string `descr:"Filter by tags (e.g., entertainment, insurance)" optional:"true"`
@@ -41,6 +43,13 @@ func main() {
 }
 
 func run(params *Params, _ *cobra.Command, _ []string) {
+	// Helper to print info messages (suppressed in JSON mode)
+	info := func(format string, args ...any) {
+		if params.Output != "json" {
+			fmt.Printf(format, args...)
+		}
+	}
+
 	parser, err := GetParser(params.Source)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -54,11 +63,11 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 			fmt.Fprintf(os.Stderr, "Error parsing file %s: %v\n", file, err)
 			os.Exit(1)
 		}
-		fmt.Printf("Loaded %d transactions from %s\n", len(txs), file)
+		info("Loaded %d transactions from %s\n", len(txs), file)
 		transactions = append(transactions, txs...)
 	}
 
-	fmt.Printf("Total: %d transactions from %d file(s)\n", len(transactions), len(params.Files))
+	info("Total: %d transactions from %d file(s)\n", len(transactions), len(params.Files))
 
 	// Load config (from provided path or default location)
 	var cfg *Config
@@ -77,7 +86,7 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 			fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Loaded config from %s\n", configPath)
+		info("Loaded config from %s\n", configPath)
 	}
 
 	// Apply grouping from config (combines transactions with different names into one)
@@ -85,8 +94,8 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 
 	// Check data coverage
 	completeMonths, dateRange := AnalyzeDataCoverage(transactions)
-	fmt.Printf("Data range: %s to %s\n", dateRange.Start.Format("2006-01-02"), dateRange.End.Format("2006-01-02"))
-	fmt.Printf("Complete months: %d\n\n", len(completeMonths))
+	info("Data range: %s to %s\n", dateRange.Start.Format("2006-01-02"), dateRange.End.Format("2006-01-02"))
+	info("Complete months: %d\n\n", len(completeMonths))
 
 	if len(completeMonths) < 3 {
 		fmt.Fprintf(os.Stderr, "Warning: Less than 3 complete months of data. Subscription detection may be unreliable.\n\n")
@@ -120,7 +129,11 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 	}
 
 	if len(subscriptions) == 0 {
-		fmt.Println("No subscriptions detected.")
+		if params.Output == "json" {
+			printSubscriptionsJSON(nil, cfg)
+		} else {
+			fmt.Println("No subscriptions detected.")
+		}
 		return
 	}
 
@@ -132,7 +145,11 @@ func run(params *Params, _ *cobra.Command, _ []string) {
 		displaySubs = filterByTags(displaySubs, params.Tags, cfg)
 	}
 
-	printSubscriptionSummary(subscriptions, displaySubs, params.Show, params.Tags, params.Sort, params.SortDir, cfg)
+	if params.Output == "json" {
+		printSubscriptionsJSON(displaySubs, cfg)
+	} else {
+		printSubscriptionSummary(subscriptions, displaySubs, params.Show, params.Tags, params.Sort, params.SortDir, cfg)
+	}
 }
 
 func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {
@@ -336,4 +353,78 @@ func printSubscriptionSummary(allSubs []Subscription, displaySubs []Subscription
 	})
 
 	t.Render()
+}
+
+// JSONOutput is the root JSON output object
+type JSONOutput struct {
+	Subscriptions []JSONSubscription `json:"subscriptions"`
+	Summary       JSONSummary        `json:"summary"`
+}
+
+// JSONSummary contains aggregate statistics
+type JSONSummary struct {
+	Count        int     `json:"count"`
+	MonthlyTotal float64 `json:"monthly_total"`
+	YearlyTotal  float64 `json:"yearly_total"`
+}
+
+// JSONSubscription is the JSON output format for a subscription
+type JSONSubscription struct {
+	Name         string   `json:"name"`
+	Description  string   `json:"description,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+	Status       string   `json:"status"`
+	TypicalDay   int      `json:"typical_day"`
+	StartDate    string   `json:"start_date"`
+	LastDate     string   `json:"last_date"`
+	LatestAmount float64  `json:"latest_amount"`
+	MinAmount    float64  `json:"min_amount"`
+	MaxAmount    float64  `json:"max_amount"`
+	YearlyCost   float64  `json:"yearly_cost"`
+}
+
+func printSubscriptionsJSON(subs []Subscription, cfg *Config) {
+	var subscriptions []JSONSubscription
+	var monthlyTotal float64
+
+	for _, sub := range subs {
+		desc := ""
+		var tags []string
+		if cfg != nil {
+			desc = cfg.GetDescription(sub.Name)
+			tags = cfg.GetTags(sub.Name)
+		}
+
+		latestAmount := math.Abs(sub.LatestAmount)
+		if sub.Status == StatusActive {
+			monthlyTotal += latestAmount
+		}
+
+		subscriptions = append(subscriptions, JSONSubscription{
+			Name:         sub.Name,
+			Description:  desc,
+			Tags:         tags,
+			Status:       string(sub.Status),
+			TypicalDay:   sub.TypicalDay,
+			StartDate:    sub.StartDate.Format("2006-01-02"),
+			LastDate:     sub.LastDate.Format("2006-01-02"),
+			LatestAmount: latestAmount,
+			MinAmount:    sub.MinAmount,
+			MaxAmount:    sub.MaxAmount,
+			YearlyCost:   latestAmount * 12,
+		})
+	}
+
+	output := JSONOutput{
+		Subscriptions: subscriptions,
+		Summary: JSONSummary{
+			Count:        len(subscriptions),
+			MonthlyTotal: monthlyTotal,
+			YearlyTotal:  monthlyTotal * 12,
+		},
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.Encode(output)
 }
