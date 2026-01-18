@@ -15,6 +15,7 @@ type Params struct {
 	Files      []string `descr:"Path(s) to transaction file(s)" positional:"true"`
 	Config     string   `descr:"Path to config file (YAML)" optional:"true"`
 	InitConfig string   `descr:"Generate config template and save to path" optional:"true"`
+	Show       string   `descr:"Which subscriptions to show" default:"active" alts:"active,stopped,all" strict:"true"`
 }
 
 func main() {
@@ -73,6 +74,9 @@ func main() {
 				subscriptions = filterSubscriptions(subscriptions, cfg)
 			}
 
+			// Filter by status based on --show flag
+			subscriptions = filterByStatus(subscriptions, params.Show)
+
 			// Generate config template if requested
 			if params.InitConfig != "" {
 				template := GenerateConfigTemplate(subscriptions)
@@ -98,6 +102,21 @@ func filterSubscriptions(subs []Subscription, cfg *Config) []Subscription {
 	var result []Subscription
 	for _, sub := range subs {
 		if !cfg.ShouldExclude(sub) {
+			result = append(result, sub)
+		}
+	}
+	return result
+}
+
+func filterByStatus(subs []Subscription, show string) []Subscription {
+	if show == "all" {
+		return subs
+	}
+	var result []Subscription
+	for _, sub := range subs {
+		if show == "active" && sub.Status == StatusActive {
+			result = append(result, sub)
+		} else if show == "stopped" && sub.Status == StatusStopped {
 			result = append(result, sub)
 		}
 	}
