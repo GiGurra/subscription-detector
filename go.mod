@@ -7,7 +7,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.7.8
 	github.com/spf13/cobra v1.10.2
 	github.com/xuri/excelize/v2 v2.10.0
-	golang.org/x/text v0.33.0
+	golang.org/x/text v0.35.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
