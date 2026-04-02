@@ -3,7 +3,7 @@ module github.com/gigurra/subscription-detector
 go 1.25.6
 
 require (
-	github.com/GiGurra/boa v1.0.2
+	github.com/GiGurra/boa v1.0.6
 	github.com/jedib0t/go-pretty/v6 v6.7.8
 	github.com/spf13/cobra v1.10.2
 	github.com/xuri/excelize/v2 v2.10.1
